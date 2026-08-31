@@ -77,7 +77,7 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
       date: today,
       time: "12:30",
       league: targetEvent.tournament?.name || "Liga Principal",
-      status: targetEvent.status?.description || "Not Started",
+      status: targetEvent.status?.type === "inprogress" ? "live" : "scheduled",
       odds: parseOdds(oddsData),
       lineups: parseLineups(lineupData),
       injuries: { homeTeam: [], awayTeam: [] },
@@ -129,7 +129,7 @@ function getFallbackMatchData(teamA: string, teamB: string, date: string): Match
     date: date,
     time: "12:30",
     league: "Serie A / Liga Principal",
-    status: "Not Started",
+    status: "scheduled",
     odds: {
       home: 2.15,
       draw: 3.30,
