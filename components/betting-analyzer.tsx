@@ -8,11 +8,13 @@ interface BettingTicketProps {
 }
 
 export function BettingTicket({ analysis }: BettingTicketProps) {
-  const riskColors = {
+  const riskColors: Record<string, string> = {
     Alto: "bg-red-100 border-red-400 text-red-800",
     Medio: "bg-yellow-100 border-yellow-400 text-yellow-800",
     Bajo: "bg-green-100 border-green-400 text-green-800",
   };
+
+  const currentRiskColor = riskColors[analysis.riskLevel] || riskColors["Medio"];
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-300">
@@ -45,7 +47,7 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
       {/* Nivel de Riesgo */}
       <div className="mb-4">
         <h3 className="font-semibold text-gray-700 mb-2">Nivel de Riesgo</h3>
-        <div className={`p-3 rounded border-2 ${riskColors[analysis.riskLevel]}`}>
+        <div className={`p-3 rounded border-2 ${currentRiskColor}`}>
           <p className="font-bold text-lg">{analysis.riskLevel}</p>
           <p className="text-sm mt-1">{analysis.riskJustification}</p>
         </div>
@@ -80,7 +82,9 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
       {/* Cuota Estimada */}
       <div className="mb-4 bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-lg border-2 border-green-400">
         <p className="text-gray-600 text-sm">Cuota Estimada (2.00 - 5.00)</p>
-        <p className="text-4xl font-bold text-green-700">{analysis.estimatedOdds.toFixed(2)}</p>
+        <p className="text-4xl font-bold text-green-700">
+          {(analysis.estimatedOdds ?? 2.5).toFixed(2)}
+        </p>
       </div>
 
       {/* Razonamiento */}
@@ -153,7 +157,7 @@ export function MatchSearcher() {
                 placeholder="Ej: Roma"
                 value={teamA}
                 onChange={(e) => setTeamA(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-900 bg-white placeholder-slate-400 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 required
               />
             </div>
@@ -164,15 +168,15 @@ export function MatchSearcher() {
                 placeholder="Ej: Lecce"
                 value={teamB}
                 onChange={(e) => setTeamB(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-900 bg-white placeholder-slate-400 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 required
               />
             </div>
           </div>
           <button
             type="submit"
-            disabled={loading || !teamA || !teamB}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg transition"
+            disabled={loading || !teamA.trim() || !teamB.trim()}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition"
           >
             {loading ? "⏳ Analizando..." : "🔍 Analizar Partido"}
           </button>
@@ -188,11 +192,13 @@ export function MatchSearcher() {
 
         {/* Loading State */}
         {loading && (
-          <div className="text-center text-white">
+          <div className="text-center text-white py-8">
             <div className="inline-block">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
             </div>
-            <p className="mt-4">Consultando API deportiva e IA...</p>
+            <p className="mt-4 text-slate-300 text-sm font-medium animate-pulse">
+              Analizando estadísticas y rendimiento de los equipos...
+            </p>
           </div>
         )}
 
@@ -203,7 +209,7 @@ export function MatchSearcher() {
         {!analysis && !error && !loading && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <p className="text-gray-600 text-lg">Introduce dos equipos para comenzar el análisis</p>
-            <p className="text-gray-400 text-sm mt-2">Los partidos se analizan automáticamente 45 minutos antes</p>
+            <p className="text-gray-400 text-sm mt-2">Los datos se procesan en tiempo real para generar la mejor selección</p>
           </div>
         )}
       </div>
