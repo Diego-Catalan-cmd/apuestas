@@ -154,21 +154,19 @@ export async function analyzeWithOpenAI(matchData: MatchData): Promise<BettingAn
 export async function analyzeWithGemini(matchData: MatchData): Promise<BettingAnalysis> {
   const prompt = buildMasterPrompt(matchData);
   
-  // Lista de modelos a intentar en orden de respaldo
-  const rawModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  // Usar únicamente modelos activos soportados en v1beta
+  const rawModel = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const preferredModel = rawModel.replace(/^models\//, "");
   
   const modelsToTry = Array.from(new Set([
     preferredModel,
-    "gemini-2.5-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro"
+    "gemini-3.6-flash",
+    "gemini-2.5-flash"
   ]));
 
   let lastError: any = null;
 
   for (const model of modelsToTry) {
-    // Intentar hasta 2 veces por modelo si hay saturación (503)
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const response = await fetch(
@@ -194,9 +192,9 @@ export async function analyzeWithGemini(matchData: MatchData): Promise<BettingAn
           }
         );
 
-        // Si el servidor está saturado (503) o en límite de tasa (429), esperar 1.5s y reintentar
+        // Si hay saturación (503) o límite de tasa (429), esperar 1.5s y reintentar
         if (response.status === 503 || response.status === 429) {
-          console.warn(`[Gemini 503/429] Modelo ${model} saturado. Reintento ${attempt}/2...`);
+          console.warn(`[Gemini ${response.status}] Modelo ${model} ocupado. Reintento ${attempt}/2...`);
           await new Promise((res) => setTimeout(res, 1500));
           continue;
         }
@@ -238,7 +236,7 @@ export async function analyzeWithGemini(matchData: MatchData): Promise<BettingAn
     }
   }
 
-  throw new Error(`Los servidores de Gemini están con alta demanda temporal (503). Reintenta en unos segundos. Detalle: ${lastError?.message}`);
+  throw new Error(`Error procesando análisis con Gemini: ${lastError?.message || "No se pudo conectar con los servidores"}`);
 }
 
 /**
