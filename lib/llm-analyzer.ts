@@ -153,77 +153,92 @@ export async function analyzeWithOpenAI(matchData: MatchData): Promise<BettingAn
  */
 export async function analyzeWithGemini(matchData: MatchData): Promise<BettingAnalysis> {
   const prompt = buildMasterPrompt(matchData);
-  const rawModel = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-  const geminiModel = rawModel.replace(/^models\//, "");
+  
+  // Lista de modelos a intentar en orden de respaldo
+  const rawModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const preferredModel = rawModel.replace(/^models\//, "");
+  
+  const modelsToTry = Array.from(new Set([
+    preferredModel,
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro"
+  ]));
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }],
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    // Intentar hasta 2 veces por modelo si hay saturación (503)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2000,
-            responseMimeType: "application/json",
-          },
-        }),
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [{ text: prompt }],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2000,
+                responseMimeType: "application/json",
+              },
+            }),
+          }
+        );
+
+        // Si el servidor está saturado (503) o en límite de tasa (429), esperar 1.5s y reintentar
+        if (response.status === 503 || response.status === 429) {
+          console.warn(`[Gemini 503/429] Modelo ${model} saturado. Reintento ${attempt}/2...`);
+          await new Promise((res) => setTimeout(res, 1500));
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`Gemini API error (${response.status}): ${errorData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!rawText) {
+          throw new Error("Respuesta vacía por parte de Gemini API");
+        }
+
+        // Limpiar formato Markdown
+        let cleanText = rawText.trim();
+        if (cleanText.startsWith("```")) {
+          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+        }
+
+        const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+        const analysis = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText) as BettingAnalysis;
+
+        return {
+          analysisConfirmed: Boolean(analysis.analysisConfirmed),
+          summary: analysis.summary || "",
+          riskLevel: analysis.riskLevel || "Medio",
+          riskJustification: analysis.riskJustification || "",
+          optimalSelection: analysis.optimalSelection || "",
+          markets: analysis.markets || [],
+          estimatedOdds: Math.max(2.0, Math.min(5.0, analysis.estimatedOdds || 2.5)),
+          reasoning: analysis.reasoning || "",
+        };
+      } catch (error: any) {
+        lastError = error;
       }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Gemini API error (${response.status}): ${errorData.error?.message || response.statusText}`);
     }
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      throw new Error("Respuesta vacía por parte de Gemini API");
-    }
-
-    // 1. Limpiar bloques de código Markdown (```json ... ```)
-    let cleanText = rawText.trim();
-    if (cleanText.startsWith("```")) {
-      cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    }
-
-    // 2. Parsear el objeto JSON limpio
-    let analysis: any;
-    try {
-      analysis = JSON.parse(cleanText);
-    } catch {
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No se pudo extraer un formato JSON válido de la respuesta");
-      }
-      analysis = JSON.parse(jsonMatch[0]);
-    }
-
-    return {
-      analysisConfirmed: Boolean(analysis.analysisConfirmed),
-      summary: analysis.summary || "",
-      riskLevel: analysis.riskLevel || "Medio",
-      riskJustification: analysis.riskJustification || "",
-      optimalSelection: analysis.optimalSelection || "",
-      markets: analysis.markets || [],
-      estimatedOdds: Math.max(2.0, Math.min(5.0, analysis.estimatedOdds || 2.5)),
-      reasoning: analysis.reasoning || "",
-    };
-  } catch (error: any) {
-    console.error("Error en análisis de Gemini:", error);
-    throw new Error(`Error en el análisis de Gemini: ${error.message}`);
   }
+
+  throw new Error(`Los servidores de Gemini están con alta demanda temporal (503). Reintenta en unos segundos. Detalle: ${lastError?.message}`);
 }
 
 /**
