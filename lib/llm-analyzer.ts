@@ -67,7 +67,7 @@ Utiliza EXCLUSIVAMENTE los siguientes mercados permitidos:
 * Prohibiciones: Estadísticas individuales de jugadores, Hándicap Asiático, "Menos de X Goles".
 
 FASE 3: OUTPUT REQUERIDO (JSON)
-Responde strictly con esta estructura JSON:
+Responde estrictamente con esta estructura JSON:
 {
   "analysisConfirmed": boolean,
   "summary": "Breve resumen clave",
@@ -87,94 +87,117 @@ Responde strictly con esta estructura JSON:
 }
 
 /**
- * Análisis con Gemini (Modelo activo gemini-3.6-flash)
+ * Análisis con Gemini (Con reintentos automáticos para picos de saturación 503)
  */
 export async function analyzeWithGemini(matchData: MatchData): Promise<BettingAnalysis> {
   const prompt = buildMasterPrompt(matchData);
-  const model = (process.env.GEMINI_MODEL || "gemini-3.6-flash").replace(/^models\//, "");
+  const rawModel = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const model = rawModel.replace(/^models\//, "");
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2000,
-            responseMimeType: "application/json",
-          },
-        }),
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 2000,
+              responseMimeType: "application/json",
+            },
+          }),
+        }
+      );
+
+      // Si el servidor está saturado (503) o en límite (429), esperar 2s y reintentar
+      if (response.status === 503 || response.status === 429) {
+        if (attempt < 3) {
+          console.warn(`[Gemini ${response.status}] Alta demanda. Reintentando (${attempt}/3) en 2s...`);
+          await new Promise((res) => setTimeout(res, 2000));
+          continue;
+        }
       }
-    );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Gemini API error (${response.status}): ${errorData.error?.message || response.statusText}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Gemini API error (${response.status}): ${errorData.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!rawText) throw new Error("Respuesta vacía por parte de Gemini API");
+
+      let cleanText = rawText.trim();
+      if (cleanText.startsWith("```")) {
+        cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      }
+
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+      const analysis = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
+
+      return parseAnalysisOutput(analysis);
+    } catch (error: any) {
+      if (attempt === 3) {
+        console.error("Error en Gemini tras reintentos:", error);
+        throw new Error(`Error procesando análisis con Gemini: ${error.message}`);
+      }
     }
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) throw new Error("Respuesta vacía por parte de Gemini API");
-
-    let cleanText = rawText.trim();
-    if (cleanText.startsWith("```")) {
-      cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    }
-
-    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-    const analysis = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
-
-    return parseAnalysisOutput(analysis);
-  } catch (error: any) {
-    console.error("Error en Gemini:", error);
-    throw new Error(`Error procesando análisis con Gemini: ${error.message}`);
   }
+
+  throw new Error("Gemini no pudo responder tras múltiples reintentos.");
 }
 
 /**
- * Opción Gratuita con Groq (Llama 3.3 70B)
+ * Análisis con Groq (Prueba varios modelos si alguno no está disponible)
  */
 export async function analyzeWithGroq(matchData: MatchData): Promise<BettingAnalysis> {
   const prompt = buildMasterPrompt(matchData);
+  const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"];
 
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "system",
-            content: "Eres un experto en análisis cuantitativo de apuestas deportivas. Responde siempre en JSON válido.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-    });
+  let lastError: any = null;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Groq API error (${response.status}): ${errorData.error?.message || response.statusText}`);
+  for (const model of groqModels) {
+    try {
+      const response = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "system",
+              content: "Eres un experto en análisis cuantitativo de apuestas deportivas. Responde siempre en JSON válido.",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Groq API error (${response.status}): ${errorData.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      const analysis = JSON.parse(data.choices[0].message.content);
+
+      return parseAnalysisOutput(analysis);
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`Groq modelo ${model} no disponible:`, error.message);
     }
-
-    const data = await response.json();
-    const analysis = JSON.parse(data.choices[0].message.content);
-
-    return parseAnalysisOutput(analysis);
-  } catch (error: any) {
-    console.error("Error en Groq:", error);
-    throw new Error(`Error procesando análisis con Groq: ${error.message}`);
   }
+
+  throw new Error(`Error procesando análisis con Groq: ${lastError?.message || "No se pudo conectar con los modelos de Groq"}`);
 }
 
 function parseAnalysisOutput(analysis: any): BettingAnalysis {
@@ -202,11 +225,11 @@ export async function analyzeMatch(matchData: MatchData): Promise<BettingAnalysi
       return await analyzeWithGemini(matchData);
     } catch (error: any) {
       geminiError = error;
-      console.warn("Gemini falló o está saturado. Reintentando con Groq...", error.message);
+      console.warn("Gemini falló. Reintentando con Groq...", error.message);
     }
   }
 
-  // 2. Respaldo secundario: Groq (Llama 3.3 70B)
+  // 2. Respaldo: Groq
   if (process.env.GROQ_API_KEY) {
     try {
       return await analyzeWithGroq(matchData);
