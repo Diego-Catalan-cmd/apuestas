@@ -1,13 +1,11 @@
 // lib/llm-analyzer.ts
 import { OpenAI } from 'openai';
 
-// Inicializamos el cliente de OpenAI de manera segura con tu API Key del archivo .env.local
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function analyzeMatches(partidos: any): Promise<any> {
-  // PROMPT MAESTRO COMPLETO: Mantiene la lógica multivariable, libre y sin límites de cuotas
   const promptSistema = `
     Actúa como un Analista de Datos de Élite y Pronosticador Cuantitativo especializado en Modelado Predictivo para Apuestas Deportivas de Fútbol.
     Tu objetivo es evaluar un cupón dinámico que contiene múltiples partidos de fútbol de forma simultánea.
@@ -16,12 +14,22 @@ export async function analyzeMatches(partidos: any): Promise<any> {
     1. Análisis Libre y sin Techos: Evalúa el rendimiento puro de los equipos sin restringirte a un rango de cuotas (elimina el techo de 2.00 a 5.00). Busca la probabilidad matemática más sólida.
     2. Enfoque Multivariable: No te limites a quién gana el partido. Analiza y sugiere pronósticos libres en base a los datos para cualquiera de los siguientes mercados si encuentras valor real:
         - Córneres Totales o por Equipo (Más/Menos)
-        - Tiros Totales o Tiros Directos al Arco
+        - Tiros Totales o Tiros Directos al Arco (especificando si son del partido o de un equipo)
         - Tarjetas Amarillas / Faltas Cometidas
         - Ambos Equipos Anotan (Sí/No)
         - Total de Goles del Partido (Líneas de Más/Menos de 1.5, 2.5, 3.5, etc.)
         - Victoria Simple o Hándicaps
-    3. Contraste de Contexto y Competición: Evalúa si las rachas recientes de los equipos son sostenibles considerando la dificultad del rival actual y la importancia del torneo (ej: sopesa la diferencia entre jugar una liga local menor frente a un partido crucial de UEFA Champions League).
+    3. Contraste de Contexto y Competición: Evalúa si las rachas recientes de los equipos son sostenibles considerando la dificultad del rival actual y la importancia del torneo.
+
+    REGLA DE PRECISIÓN DE MERCADO (OBLIGATORIA):
+    - En mercados de TIROS o REMATES: Especifica SIEMPRE si te refieres a "tiros totales" o "tiros a puerta / al arco", e indica EXPLÍCITAMENTE si la métrica es "del partido" o "de un equipo en específico".
+      Ejemplos de selecciones válidas y precisas: 
+      * 'Más de 4.5 tiros al arco de Crystal Palace'
+      * 'Más de 12.5 tiros totales de Crystal Palace'
+      * 'Más de 22.5 tiros totales del partido'
+      * 'Más de 8.5 tiros al arco totales del partido'
+      Jamás devuelvas un mercado ambiguo como 'Más de 18.5 tiros totales' sin definir si es del partido completo o de qué equipo.
+    - Aplica esta misma claridad para CÓRNERES, TARJETAS y GOLES (ej: 'Más de 4.5 córneres de Flamengo RJ' o 'Más de 8.5 córneres totales del partido').
 
     REGLA DE FORMATO CRÍTICA:
     Debes devolver la respuesta ESTRICTAMENTE en el siguiente formato de objeto JSON para que mi backend pueda parsearlo. No agregues texto de introducción ni cierres, solo el objeto JSON:
@@ -31,7 +39,7 @@ export async function analyzeMatches(partidos: any): Promise<any> {
         {
           "partido": "Nombre del Partido (Ej: Manchester City vs FC Barcelona)",
           "analisis_contextual": "Explicación concisa de 2 o 3 líneas detallando por qué la racha se mantiene o se frena, justificando el mercado elegido mediante estadísticas de córneres, tiros, goles o tarjetas.",
-          "pronostico_sugerido": "El mercado exacto recomendado (Ej: 'Más de 5.5 córneres del Manchester City' o 'Más de 2.5 goles totales')",
+          "pronostico_sugerido": "El mercado exacto recomendado (Ej: 'Más de 4.5 tiros al arco de Crystal Palace' o 'Más de 2.5 goles totales del partido')",
           "probabilidad_estimada": 85, 
           "confianza": "Alta" 
         }
@@ -52,7 +60,6 @@ export async function analyzeMatches(partidos: any): Promise<any> {
         { role: 'system', content: promptSistema },
         { role: 'user', content: `Analiza minuciosamente los siguientes partidos para armar el cupón: ${JSON.stringify(partidos)}` }
       ],
-      // Forzamos a gpt-4o a devolver un JSON estructurado perfecto
       response_format: { type: "json_object" }
     });
 
@@ -61,7 +68,6 @@ export async function analyzeMatches(partidos: any): Promise<any> {
 
     const parsedData = JSON.parse(resultadoTexto);
 
-    // Mapeo defensivo con tipos explícitos para evitar TS7006 en Render
     if (parsedData.cupon_analisis && Array.isArray(parsedData.cupon_analisis)) {
       const primerPartido = parsedData.cupon_analisis[0];
 
@@ -89,5 +95,4 @@ export async function analyzeMatches(partidos: any): Promise<any> {
   }
 }
 
-// Exportación secundaria para garantizar retrocompatibilidad
 export const analyzeMatch = analyzeMatches;
