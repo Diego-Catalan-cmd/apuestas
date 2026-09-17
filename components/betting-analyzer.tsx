@@ -1,133 +1,60 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { BettingAnalysis } from "@/lib/types";
+import { CuponAnalisisResponse, CuponItem } from "@/lib/types";
 
-interface BettingTicketProps {
-  analysis: BettingAnalysis & { matchInfo?: any };
+interface MatchInput {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
 }
 
-export function BettingTicket({ analysis }: BettingTicketProps) {
-  const riskColors: Record<string, string> = {
-    Alto: "bg-red-100 border-red-400 text-red-800",
-    Medio: "bg-yellow-100 border-yellow-400 text-yellow-800",
-    Bajo: "bg-green-100 border-green-400 text-green-800",
+export default function BettingAnalyzer() {
+  const [matches, setMatches] = useState<MatchInput[]>([
+    { id: "1", homeTeam: "", awayTeam: "" },
+    { id: "2", homeTeam: "", awayTeam: "" },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<CuponAnalisisResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Manejadores para agregar/eliminar/actualizar partidos
+  const handleAddMatch = () => {
+    setMatches([
+      ...matches,
+      { id: Date.now().toString(), homeTeam: "", awayTeam: "" },
+    ]);
   };
 
-  const riskKey = analysis.riskLevel || "Medio";
-  const currentRiskColor = riskColors[riskKey] || riskColors["Medio"];
+  const handleRemoveMatch = (id: string) => {
+    if (matches.length > 1) {
+      setMatches(matches.filter((m) => m.id !== id));
+    }
+  };
 
-  const homeTeamName = analysis.matchInfo?.homeTeam || analysis.matchInfo?.teamA || "Local";
-  const awayTeamName = analysis.matchInfo?.awayTeam || analysis.matchInfo?.teamB || "Visitante";
-
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-300">
-      {/* Header del Ticket */}
-      <div className="border-b-2 border-dashed border-gray-300 pb-4 mb-4">
-        <h2 className="text-2xl font-bold text-gray-800">🎫 TICKET DE APUESTA</h2>
-        {analysis.matchInfo && (
-          <div className="text-sm text-gray-600 mt-2">
-            <p className="font-semibold text-base text-gray-900">
-              {homeTeamName} vs {awayTeamName}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {analysis.matchInfo.league || "Competición General"} • {analysis.matchInfo.date || "Fecha pendiente"} {analysis.matchInfo.time || ""}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Confirmación de Análisis */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xl">{analysis.analysisConfirmed ? "✅" : "⚠️"}</span>
-          <h3 className="font-semibold text-gray-700">Confirmación de Análisis</h3>
-        </div>
-        <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded leading-relaxed">
-          {analysis.summary || "Análisis cuantitativo procesado."}
-        </p>
-      </div>
-
-      {/* Nivel de Riesgo */}
-      <div className="mb-4">
-        <h3 className="font-semibold text-gray-700 mb-2">Nivel de Riesgo</h3>
-        <div className={`p-3 rounded border-2 ${currentRiskColor}`}>
-          <p className="font-bold text-lg">{analysis.riskLevel || "MEDIO"}</p>
-          {analysis.riskJustification && (
-            <p className="text-sm mt-1">{analysis.riskJustification}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Selección Óptima */}
-      {analysis.optimalSelection && (
-        <div className="mb-4">
-          <h3 className="font-semibold text-gray-700 mb-2">⚽ Selección Óptima</h3>
-          <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r">
-            <p className="text-sm font-semibold text-blue-900">{analysis.optimalSelection}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Mercados */}
-      {Array.isArray(analysis.markets) && analysis.markets.length > 0 && (
-        <div className="mb-4">
-          <h3 className="font-semibold text-gray-700 mb-2">Mercados Seleccionados</h3>
-          <div className="space-y-2">
-            {analysis.markets.map((market: any, idx: number) => (
-              <div
-                key={idx}
-                className="flex justify-between items-center bg-gray-50 p-2.5 rounded border border-gray-100 text-sm"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{market.market || market.name || "Mercado"}</p>
-                  <p className="text-gray-600 text-xs">{market.selection || market.value || "Sugerencia"}</p>
-                </div>
-                {(market.odds || market.odd) && (
-                  <span className="text-lg font-bold text-blue-600">{market.odds || market.odd}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Cuota Estimada */}
-      <div className="mb-4 bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-lg border-2 border-green-400">
-        <p className="text-gray-600 text-sm font-medium">Cuota Estimada de Valor</p>
-        <p className="text-4xl font-bold text-green-700">
-          {Number(analysis.estimatedOdds ?? 1.85).toFixed(2)}
-        </p>
-      </div>
-
-      {/* Razonamiento */}
-      {analysis.reasoning && (
-        <div className="bg-gray-50 p-4 rounded border border-gray-100">
-          <h3 className="font-semibold text-gray-700 mb-2">📊 Razonamiento Detallado</h3>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-            {analysis.reasoning}
-          </p>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="border-t-2 border-dashed border-gray-300 mt-4 pt-4 text-center text-xs text-gray-500 space-y-1">
-        <p>⚠️ DISCLAIMER: Este análisis es para propósitos informativos. No constituye asesoramiento financiero.</p>
-        <p>Apuesta responsablemente.</p>
-      </div>
-    </div>
-  );
-}
-
-export default function MatchSearcher() {
-  const [homeTeam, setHomeTeam] = useState("");
-  const [awayTeam, setAwayTeam] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<(BettingAnalysis & { matchInfo?: any }) | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const handleMatchChange = (
+    id: string,
+    field: "homeTeam" | "awayTeam",
+    value: string
+  ) => {
+    setMatches(
+      matches.map((m) => (m.id === id ? { ...m, [field]: value } : m))
+    );
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    // Filtrar partidos vacíos
+    const validMatches = matches.filter(
+      (m) => m.homeTeam.trim() !== "" && m.awayTeam.trim() !== ""
+    );
+
+    if (validMatches.length === 0) {
+      setError("Por favor, ingresa al menos un partido completo.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setAnalysis(null);
@@ -136,18 +63,24 @@ export default function MatchSearcher() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ homeTeam, awayTeam }),
+        body: JSON.stringify({
+          partidos: validMatches.map((m) => ({
+            homeTeam: m.homeTeam,
+            awayTeam: m.awayTeam,
+            partido: `${m.homeTeam} vs ${m.awayTeam}`,
+          })),
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        setError(data.error || "Error procesando la solicitud");
+        setError(data.error || "Error al procesar el cupón de partidos");
         return;
       }
 
       setAnalysis(data.data);
-    } catch (err) {
+    } catch (err: any) {
       setError("Error al conectar con el servidor de análisis");
       console.error(err);
     } finally {
@@ -156,77 +89,183 @@ export default function MatchSearcher() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-[#0f172a] text-white p-4 md:p-8 font-sans">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white mb-2">⚽ Analizador de Apuestas</h1>
-          <p className="text-gray-300">Análisis cuantitativo de fútbol impulsado por IA</p>
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center justify-center gap-2">
+            ⚽ <span>Analizador de Apuestas</span>
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Genera cupones y combinadas de alto valor con Inteligencia Artificial
+          </p>
         </div>
 
-        {/* Formulario de Búsqueda */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-2xl p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Equipo Local</label>
-              <input
-                type="text"
-                placeholder="Ej: Manchester City"
-                value={homeTeam}
-                onChange={(e) => setHomeTeam(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-900 bg-white placeholder-slate-400 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Equipo Visitante</label>
-              <input
-                type="text"
-                placeholder="Ej: Real Madrid"
-                value={awayTeam}
-                onChange={(e) => setAwayTeam(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-900 bg-white placeholder-slate-400 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                required
-              />
-            </div>
+        {/* Formulario de Partidos Múltiples */}
+        <form
+          onSubmit={handleSubmit}
+          className="bg-slate-800/80 backdrop-blur border border-slate-700/60 rounded-2xl p-5 shadow-xl space-y-4"
+        >
+          <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+            <h2 className="text-lg font-bold text-slate-200">
+              Cupón de Partidos ({matches.length})
+            </h2>
+            <button
+              type="button"
+              onClick={handleAddMatch}
+              className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg transition"
+            >
+              + Agregar Partido
+            </button>
           </div>
+
+          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+            {matches.map((match, index) => (
+              <div
+                key={match.id}
+                className="flex items-center gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-700/40"
+              >
+                <span className="text-xs text-slate-500 font-bold w-5">
+                  #{index + 1}
+                </span>
+
+                <input
+                  type="text"
+                  placeholder="Local (ej: Arsenal)"
+                  value={match.homeTeam}
+                  onChange={(e) =>
+                    handleMatchChange(match.id, "homeTeam", e.target.value)
+                  }
+                  className="w-full bg-slate-800 border border-slate-600/60 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  required
+                />
+
+                <span className="text-xs text-slate-400 font-bold">VS</span>
+
+                <input
+                  type="text"
+                  placeholder="Visitante (ej: Chelsea)"
+                  value={match.awayTeam}
+                  onChange={(e) =>
+                    handleMatchChange(match.id, "awayTeam", e.target.value)
+                  }
+                  className="w-full bg-slate-800 border border-slate-600/60 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  required
+                />
+
+                {matches.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMatch(match.id)}
+                    className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition"
+                    title="Eliminar partido"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
           <button
             type="submit"
-            disabled={loading || !homeTeam.trim() || !awayTeam.trim()}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-lg transition duration-200"
           >
-            {loading ? "⏳ Analizando..." : "🔍 Analizar Partido"}
+            {loading ? "⏳ Analizando Cupón con IA..." : "🔍 Analizar Combinada"}
           </button>
         </form>
 
-        {/* Mensaje de Error */}
+        {/* Error */}
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-8">
-            <p className="font-bold">Notificación</p>
-            <p className="text-sm mt-1">{error}</p>
+          <div className="bg-red-950/80 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm">
+            ⚠️ {error}
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loader */}
         {loading && (
-          <div className="text-center text-white py-8">
-            <div className="inline-block">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-            </div>
-            <p className="mt-4 text-slate-300 text-sm font-medium animate-pulse">
-              Consultando estadísticas y generando predicción cuantitativa...
+          <div className="text-center py-10 space-y-3">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+            <p className="text-slate-400 text-sm animate-pulse">
+              Evaluando córneres, tarjetas, goles y rachas de todos los partidos...
             </p>
           </div>
         )}
 
-        {/* Ticket de Apuesta */}
-        {analysis && !loading && <BettingTicket analysis={analysis} />}
+        {/* BOLETO DE APUESTA ESTILO BETANO */}
+        {analysis && !loading && (
+          <div className="bg-[#1e293b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden font-sans">
+            {/* Header Betano */}
+            <div className="bg-gradient-to-r from-[#161f2c] to-[#1e293b] p-5 border-b border-slate-700/80">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    Combinada de {analysis.cupon_analisis?.length || 1}
+                  </span>
+                  <h2 className="text-xl font-extrabold text-white mt-1">
+                    🎯 Cupón Recomendado
+                  </h2>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400 font-medium">Cuota Total Est.</p>
+                  <p className="text-3xl font-black text-emerald-400">
+                    {analysis.combinada_sugerida?.cuota_total_estimada ||
+                      analysis.estimatedOdds ||
+                      "2.50"}
+                  </p>
+                </div>
+              </div>
 
-        {/* Estado Inicial */}
-        {!analysis && !error && !loading && (
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <p className="text-gray-600 text-lg font-medium">Ingresa dos equipos para comenzar</p>
-            <p className="text-gray-400 text-sm mt-2">El motor cuantitativo evaluará datos en tiempo real con OpenAI</p>
+              {analysis.combinada_sugerida?.justificacion_global && (
+                <div className="mt-3 bg-slate-900/70 p-3 rounded-xl border border-slate-700/50 text-xs text-slate-300 leading-relaxed">
+                  💡 <span className="font-semibold text-slate-200">Estrategia Global:</span>{" "}
+                  {analysis.combinada_sugerida.justificacion_global}
+                </div>
+              )}
+            </div>
+
+            {/* Lista de Selecciones en el Cupón */}
+            <div className="divide-y divide-slate-700/60">
+              {analysis.cupon_analisis?.map((item: CuponItem, idx: number) => (
+                <div
+                  key={idx}
+                  className="p-4 bg-slate-800/40 hover:bg-slate-800/70 transition space-y-2"
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs">
+                        ✓
+                      </span>
+                      <div>
+                        <p className="text-base font-bold text-white leading-tight">
+                          {item.pronostico_sugerido}
+                        </p>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          {item.partido}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <span className="inline-block bg-blue-500/10 text-blue-400 font-bold text-xs px-2 py-1 rounded-lg border border-blue-500/20">
+                        {item.probabilidad_estimada || 80}% Prob.
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800 leading-relaxed pl-8">
+                    {item.analisis_contextual}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer Betano */}
+            <div className="bg-[#131b26] p-4 text-center text-[11px] text-slate-500 border-t border-slate-700/80 space-y-1">
+              <p>ID Análisis: #{Math.floor(100000000 + Math.random() * 900000000)}</p>
+              <p>⚠️ Este cupón es generado por modelos cuantitativos predictivos. Apuesta de forma responsable.</p>
+            </div>
           </div>
         )}
       </div>
