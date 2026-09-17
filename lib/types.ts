@@ -46,6 +46,9 @@ export interface BettingAnalysis {
   rawResponse?: string;
   cupon_analisis?: CuponItem[];
   combinada_sugerida?: CombinadaSugerida;
+  estimatedOdds?: number;
+  analysisConfirmed?: boolean;
+  matchInfo?: any;
   [key: string]: any;
 }
 
@@ -58,6 +61,9 @@ export type BatchBettingAnalysis = BettingAnalysis & {
   reasoning?: string;
   cupon_analisis?: CuponItem[];
   combinada_sugerida?: CombinadaSugerida;
+  estimatedOdds?: number;
+  analysisConfirmed?: boolean;
+  matchInfo?: any;
   [key: string]: any;
 };
 
@@ -71,8 +77,11 @@ export interface MatchData {
   };
   goals?: { home?: number; away?: number };
   score?: any;
-  league?: { id?: number; name: string; country?: string; season?: number };
-  fixture?: { date?: string; status?: { short?: string; long?: string } };
+  league?: any; // Acepta tanto un string como un objeto { id, name, country, season }
+  fixture?: any;
+  date?: string;
+  time?: string;
+  status?: string;
   [key: string]: any;
 }
 
@@ -93,8 +102,10 @@ export interface LineupsData { [key: string]: any; }
 export interface InjuriesData { [key: string]: any; }
 export interface HistoricalStats { [key: string]: any; }
 export interface TeamAverages { [key: string]: any; }
+
 export interface ApiResponse {
   success: boolean;
   data?: any;
   error?: string;
+  [key: string]: any;
 }
