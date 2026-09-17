@@ -1,100 +1,100 @@
-/**
- * Tipos de datos para el análisis cuantitativo de apuestas deportivas
- */
+// lib/types.ts
 
-// --- Entradas y Peticiones ---
-
-export interface MatchRequest {
-  homeTeam: string;
-  awayTeam: string;
-  league?: string;
+export interface CuponItem {
+  partido: string;
+  analisis_contextual: string;
+  pronostico_sugerido: string;
+  probabilidad_estimada: number;
+  confianza: string;
+  [key: string]: any;
 }
 
-export interface PlayerInfo {
-  id: string;
-  name: string;
-  position: string;
-  number: number;
-  injured: boolean;
-  rating?: number;
+export interface CombinadaSugerida {
+  cuota_total_estimada: number;
+  justificacion_global: string;
+  [key: string]: any;
 }
 
-export interface InjuryInfo {
-  player: string;
-  type: string;
-  returnDate?: string;
-}
-
-export interface LineupsData {
-  homeTeam: {
-    formation: string;
-    players: PlayerInfo[];
-  };
-  awayTeam: {
-    formation: string;
-    players: PlayerInfo[];
-  };
-}
-
-export interface InjuriesData {
-  homeTeam: InjuryInfo[];
-  awayTeam: InjuryInfo[];
-}
-
-export interface OddsData {
-  home: number; // Cuota victoria local
-  draw: number; // Cuota empate
-  away: number; // Cuota victoria visitante
-  over2_5?: number; // Más de 2.5 goles
-  under2_5?: number; // Menos de 2.5 goles
-  bothTeamsScore?: number; // Ambos equipos anotan
-  [key: string]: number | undefined; // Flexibilidad para córneres, tarjetas o tiros
-}
-
-export interface MatchData {
-  matchId: string;
-  homeTeam: string;
-  awayTeam: string;
-  date: string;
-  time: string;
-  league: string;
-  status: "scheduled" | "live" | "finished";
-  odds?: OddsData;
-  lineups?: LineupsData;
-  injuries?: InjuriesData;
-}
-
-// --- Salidas y Análisis del Agente IA ---
-
-export interface MarketSelection {
-  market: string; // ej: "Córneres Totales", "Tiros a Puerta"
-  selection: string; // ej: "Más de 8.5", "Gana Local"
-  odds?: number;
+export interface CuponAnalisisResponse {
+  cupon_analisis?: CuponItem[];
+  combinada_sugerida?: CombinadaSugerida;
+  [key: string]: any;
 }
 
 export interface MatchPrediction {
-  match: string; // ej: "Real Madrid vs Barcelona"
-  recommended_market: string;
-  confidence: number; // Porcentaje de confianza (0 - 100)
-  riskLevel: "Alto" | "Medio" | "Bajo";
-  reasoning: string;
-  markets?: MarketSelection[];
+  matchId?: string | number;
+  homeTeam?: string;
+  awayTeam?: string;
+  prediction?: string;
+  confidence?: number;
+  reasoning?: string;
+  suggestedBet?: string;
+  odds?: number;
+  [key: string]: any;
 }
 
-export interface BatchBettingAnalysis {
-  analysisConfirmed: boolean;
-  global_analysis: string; // Evaluación general de la combinada o cupón
-  estimatedOdds?: number; // Cuota acumulada o estimada
-  predictions: MatchPrediction[]; // Predicción individual para cada partido
+export interface BettingAnalysis {
+  summary?: string;
+  predictions?: MatchPrediction[];
+  recommendedBets?: any[];
+  riskLevel?: string;
+  riskJustification?: string;
+  optimalSelection?: string;
+  markets?: any[];
+  reasoning?: string;
+  confidenceScore?: number;
+  rawResponse?: string;
+  cupon_analisis?: CuponItem[];
+  combinada_sugerida?: CombinadaSugerida;
+  [key: string]: any;
 }
 
-// Alias de compatibilidad para llamadas individuales o por lote
-export type BettingAnalysis = BatchBettingAnalysis;
+export type BatchBettingAnalysis = BettingAnalysis & {
+  summary?: string;
+  riskLevel?: string;
+  riskJustification?: string;
+  optimalSelection?: string;
+  markets?: any[];
+  reasoning?: string;
+  cupon_analisis?: CuponItem[];
+  combinada_sugerida?: CombinadaSugerida;
+  [key: string]: any;
+};
 
-// --- Respuesta de la API ---
+export interface MatchData {
+  fixtureId?: number;
+  teamA?: any;
+  teamB?: any;
+  teams?: {
+    home: { id?: number; name: string; logo?: string };
+    away: { id?: number; name: string; logo?: string };
+  };
+  goals?: { home?: number; away?: number };
+  score?: any;
+  league?: { id?: number; name: string; country?: string; season?: number };
+  fixture?: { date?: string; status?: { short?: string; long?: string } };
+  [key: string]: any;
+}
 
-export interface ApiResponse<T = BatchBettingAnalysis> {
+export interface MatchRequest {
+  fixtureId?: number;
+  homeTeam?: string;
+  awayTeam?: string;
+  teamA?: string;
+  teamB?: string;
+  league?: string;
+  date?: string;
+  partidos?: any[];
+  [key: string]: any;
+}
+
+export interface OddsData { [key: string]: any; }
+export interface LineupsData { [key: string]: any; }
+export interface InjuriesData { [key: string]: any; }
+export interface HistoricalStats { [key: string]: any; }
+export interface TeamAverages { [key: string]: any; }
+export interface ApiResponse {
   success: boolean;
-  data?: T;
+  data?: any;
   error?: string;
 }

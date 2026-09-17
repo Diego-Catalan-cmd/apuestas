@@ -14,9 +14,9 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
     Bajo: "bg-green-100 border-green-400 text-green-800",
   };
 
-  const currentRiskColor = riskColors[analysis.riskLevel] || riskColors["Medio"];
+  const riskKey = analysis.riskLevel || "Medio";
+  const currentRiskColor = riskColors[riskKey] || riskColors["Medio"];
 
-  // Compatibilidad con la nomenclatura homeTeam/awayTeam y teamA/teamB
   const homeTeamName = analysis.matchInfo?.homeTeam || analysis.matchInfo?.teamA || "Local";
   const awayTeamName = analysis.matchInfo?.awayTeam || analysis.matchInfo?.teamB || "Visitante";
 
@@ -31,7 +31,7 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
               {homeTeamName} vs {awayTeamName}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
-              {analysis.matchInfo.league} • {analysis.matchInfo.date} {analysis.matchInfo.time}
+              {analysis.matchInfo.league || "Competición General"} • {analysis.matchInfo.date || "Fecha pendiente"} {analysis.matchInfo.time || ""}
             </p>
           </div>
         )}
@@ -44,7 +44,7 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
           <h3 className="font-semibold text-gray-700">Confirmación de Análisis</h3>
         </div>
         <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded leading-relaxed">
-          {analysis.summary}
+          {analysis.summary || "Análisis cuantitativo procesado."}
         </p>
       </div>
 
@@ -52,7 +52,7 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
       <div className="mb-4">
         <h3 className="font-semibold text-gray-700 mb-2">Nivel de Riesgo</h3>
         <div className={`p-3 rounded border-2 ${currentRiskColor}`}>
-          <p className="font-bold text-lg">{analysis.riskLevel}</p>
+          <p className="font-bold text-lg">{analysis.riskLevel || "MEDIO"}</p>
           {analysis.riskJustification && (
             <p className="text-sm mt-1">{analysis.riskJustification}</p>
           )}
@@ -60,29 +60,31 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
       </div>
 
       {/* Selección Óptima */}
-      <div className="mb-4">
-        <h3 className="font-semibold text-gray-700 mb-2">⚽ Selección Óptima</h3>
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r">
-          <p className="text-sm font-semibold text-blue-900">{analysis.optimalSelection}</p>
+      {analysis.optimalSelection && (
+        <div className="mb-4">
+          <h3 className="font-semibold text-gray-700 mb-2">⚽ Selección Óptima</h3>
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r">
+            <p className="text-sm font-semibold text-blue-900">{analysis.optimalSelection}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mercados */}
-      {analysis.markets && analysis.markets.length > 0 && (
+      {Array.isArray(analysis.markets) && analysis.markets.length > 0 && (
         <div className="mb-4">
           <h3 className="font-semibold text-gray-700 mb-2">Mercados Seleccionados</h3>
           <div className="space-y-2">
-            {analysis.markets.map((market, idx) => (
+            {analysis.markets.map((market: any, idx: number) => (
               <div
                 key={idx}
                 className="flex justify-between items-center bg-gray-50 p-2.5 rounded border border-gray-100 text-sm"
               >
                 <div>
-                  <p className="font-medium text-gray-800">{market.market}</p>
-                  <p className="text-gray-600 text-xs">{market.selection}</p>
+                  <p className="font-medium text-gray-800">{market.market || market.name || "Mercado"}</p>
+                  <p className="text-gray-600 text-xs">{market.selection || market.value || "Sugerencia"}</p>
                 </div>
-                {market.odds && (
-                  <span className="text-lg font-bold text-blue-600">{market.odds}</span>
+                {(market.odds || market.odd) && (
+                  <span className="text-lg font-bold text-blue-600">{market.odds || market.odd}</span>
                 )}
               </div>
             ))}
@@ -90,21 +92,23 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
         </div>
       )}
 
-      {/* Cuota Estimada (Analítica cuantitativa libre) */}
+      {/* Cuota Estimada */}
       <div className="mb-4 bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-lg border-2 border-green-400">
         <p className="text-gray-600 text-sm font-medium">Cuota Estimada de Valor</p>
         <p className="text-4xl font-bold text-green-700">
-          {(analysis.estimatedOdds ?? 1.85).toFixed(2)}
+          {Number(analysis.estimatedOdds ?? 1.85).toFixed(2)}
         </p>
       </div>
 
       {/* Razonamiento */}
-      <div className="bg-gray-50 p-4 rounded border border-gray-100">
-        <h3 className="font-semibold text-gray-700 mb-2">📊 Razonamiento Detallado</h3>
-        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-          {analysis.reasoning}
-        </p>
-      </div>
+      {analysis.reasoning && (
+        <div className="bg-gray-50 p-4 rounded border border-gray-100">
+          <h3 className="font-semibold text-gray-700 mb-2">📊 Razonamiento Detallado</h3>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+            {analysis.reasoning}
+          </p>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="border-t-2 border-dashed border-gray-300 mt-4 pt-4 text-center text-xs text-gray-500 space-y-1">
@@ -137,7 +141,7 @@ export default function MatchSearcher() {
 
       const data = await response.json();
 
-      if (!data.success) {
+      if (!response.ok || !data.success) {
         setError(data.error || "Error procesando la solicitud");
         return;
       }
@@ -210,7 +214,7 @@ export default function MatchSearcher() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
             </div>
             <p className="mt-4 text-slate-300 text-sm font-medium animate-pulse">
-              Consultando alineaciones, bajas y generando predicción cuantitativa...
+              Consultando estadísticas y generando predicción cuantitativa...
             </p>
           </div>
         )}
@@ -222,7 +226,7 @@ export default function MatchSearcher() {
         {!analysis && !error && !loading && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <p className="text-gray-600 text-lg font-medium">Ingresa dos equipos para comenzar</p>
-            <p className="text-gray-400 text-sm mt-2">El motor cuantitativo evaluará datos en tiempo real con OpenAI / Gemini</p>
+            <p className="text-gray-400 text-sm mt-2">El motor cuantitativo evaluará datos en tiempo real con OpenAI</p>
           </div>
         )}
       </div>
