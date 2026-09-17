@@ -16,6 +16,10 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
 
   const currentRiskColor = riskColors[analysis.riskLevel] || riskColors["Medio"];
 
+  // Compatibilidad con la nomenclatura homeTeam/awayTeam y teamA/teamB
+  const homeTeamName = analysis.matchInfo?.homeTeam || analysis.matchInfo?.teamA || "Local";
+  const awayTeamName = analysis.matchInfo?.awayTeam || analysis.matchInfo?.teamB || "Visitante";
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-300">
       {/* Header del Ticket */}
@@ -23,10 +27,10 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
         <h2 className="text-2xl font-bold text-gray-800">🎫 TICKET DE APUESTA</h2>
         {analysis.matchInfo && (
           <div className="text-sm text-gray-600 mt-2">
-            <p className="font-semibold">
-              {analysis.matchInfo.teamA} vs {analysis.matchInfo.teamB}
+            <p className="font-semibold text-base text-gray-900">
+              {homeTeamName} vs {awayTeamName}
             </p>
-            <p className="text-xs">
+            <p className="text-xs text-gray-500 mt-0.5">
               {analysis.matchInfo.league} • {analysis.matchInfo.date} {analysis.matchInfo.time}
             </p>
           </div>
@@ -39,7 +43,7 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
           <span className="text-xl">{analysis.analysisConfirmed ? "✅" : "⚠️"}</span>
           <h3 className="font-semibold text-gray-700">Confirmación de Análisis</h3>
         </div>
-        <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+        <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded leading-relaxed">
           {analysis.summary}
         </p>
       </div>
@@ -49,15 +53,17 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
         <h3 className="font-semibold text-gray-700 mb-2">Nivel de Riesgo</h3>
         <div className={`p-3 rounded border-2 ${currentRiskColor}`}>
           <p className="font-bold text-lg">{analysis.riskLevel}</p>
-          <p className="text-sm mt-1">{analysis.riskJustification}</p>
+          {analysis.riskJustification && (
+            <p className="text-sm mt-1">{analysis.riskJustification}</p>
+          )}
         </div>
       </div>
 
       {/* Selección Óptima */}
       <div className="mb-4">
         <h3 className="font-semibold text-gray-700 mb-2">⚽ Selección Óptima</h3>
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-3">
-          <p className="text-sm text-gray-700">{analysis.optimalSelection}</p>
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r">
+          <p className="text-sm font-semibold text-blue-900">{analysis.optimalSelection}</p>
         </div>
       </div>
 
@@ -67,44 +73,51 @@ export function BettingTicket({ analysis }: BettingTicketProps) {
           <h3 className="font-semibold text-gray-700 mb-2">Mercados Seleccionados</h3>
           <div className="space-y-2">
             {analysis.markets.map((market, idx) => (
-              <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm">
+              <div
+                key={idx}
+                className="flex justify-between items-center bg-gray-50 p-2.5 rounded border border-gray-100 text-sm"
+              >
                 <div>
                   <p className="font-medium text-gray-800">{market.market}</p>
-                  <p className="text-gray-600">{market.selection}</p>
+                  <p className="text-gray-600 text-xs">{market.selection}</p>
                 </div>
-                {market.odds && <span className="text-lg font-bold text-blue-600">{market.odds}</span>}
+                {market.odds && (
+                  <span className="text-lg font-bold text-blue-600">{market.odds}</span>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Cuota Estimada */}
+      {/* Cuota Estimada (Analítica cuantitativa libre) */}
       <div className="mb-4 bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-lg border-2 border-green-400">
-        <p className="text-gray-600 text-sm">Cuota Estimada (2.00 - 5.00)</p>
+        <p className="text-gray-600 text-sm font-medium">Cuota Estimada de Valor</p>
         <p className="text-4xl font-bold text-green-700">
-          {(analysis.estimatedOdds ?? 2.5).toFixed(2)}
+          {(analysis.estimatedOdds ?? 1.85).toFixed(2)}
         </p>
       </div>
 
       {/* Razonamiento */}
-      <div className="bg-gray-50 p-4 rounded">
+      <div className="bg-gray-50 p-4 rounded border border-gray-100">
         <h3 className="font-semibold text-gray-700 mb-2">📊 Razonamiento Detallado</h3>
-        <p className="text-sm text-gray-700 leading-relaxed">{analysis.reasoning}</p>
+        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+          {analysis.reasoning}
+        </p>
       </div>
 
       {/* Footer */}
-      <div className="border-t-2 border-dashed border-gray-300 mt-4 pt-4 text-center text-xs text-gray-500">
-        <p>⚠️ DISCLAIMER: Este análisis es para propósitos educativos. No es asesoramiento financiero.</p>
-        <p>Apuesta responsablemente. Conoce tus límites.</p>
+      <div className="border-t-2 border-dashed border-gray-300 mt-4 pt-4 text-center text-xs text-gray-500 space-y-1">
+        <p>⚠️ DISCLAIMER: Este análisis es para propósitos informativos. No constituye asesoramiento financiero.</p>
+        <p>Apuesta responsablemente.</p>
       </div>
     </div>
   );
 }
 
-export function MatchSearcher() {
-  const [teamA, setTeamA] = useState("");
-  const [teamB, setTeamB] = useState("");
+export default function MatchSearcher() {
+  const [homeTeam, setHomeTeam] = useState("");
+  const [awayTeam, setAwayTeam] = useState("");
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<(BettingAnalysis & { matchInfo?: any }) | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,19 +132,19 @@ export function MatchSearcher() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamA, teamB }),
+        body: JSON.stringify({ homeTeam, awayTeam }),
       });
 
       const data = await response.json();
 
       if (!data.success) {
-        setError(data.error || "Error en la solicitud");
+        setError(data.error || "Error procesando la solicitud");
         return;
       }
 
       setAnalysis(data.data);
     } catch (err) {
-      setError("Error conectando con el servidor");
+      setError("Error al conectar con el servidor de análisis");
       console.error(err);
     } finally {
       setLoading(false);
@@ -144,7 +157,7 @@ export function MatchSearcher() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold text-white mb-2">⚽ Analizador de Apuestas</h1>
-          <p className="text-gray-300">Análisis IA de partidos de fútbol con cuotas de alto valor</p>
+          <p className="text-gray-300">Análisis cuantitativo de fútbol impulsado por IA</p>
         </div>
 
         {/* Formulario de Búsqueda */}
@@ -154,9 +167,9 @@ export function MatchSearcher() {
               <label className="block text-sm font-semibold text-gray-700 mb-2">Equipo Local</label>
               <input
                 type="text"
-                placeholder="Ej: Roma"
-                value={teamA}
-                onChange={(e) => setTeamA(e.target.value)}
+                placeholder="Ej: Manchester City"
+                value={homeTeam}
+                onChange={(e) => setHomeTeam(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-900 bg-white placeholder-slate-400 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 required
               />
@@ -165,9 +178,9 @@ export function MatchSearcher() {
               <label className="block text-sm font-semibold text-gray-700 mb-2">Equipo Visitante</label>
               <input
                 type="text"
-                placeholder="Ej: Lecce"
-                value={teamB}
-                onChange={(e) => setTeamB(e.target.value)}
+                placeholder="Ej: Real Madrid"
+                value={awayTeam}
+                onChange={(e) => setAwayTeam(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-slate-900 bg-white placeholder-slate-400 font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 required
               />
@@ -175,7 +188,7 @@ export function MatchSearcher() {
           </div>
           <button
             type="submit"
-            disabled={loading || !teamA.trim() || !teamB.trim()}
+            disabled={loading || !homeTeam.trim() || !awayTeam.trim()}
             className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition"
           >
             {loading ? "⏳ Analizando..." : "🔍 Analizar Partido"}
@@ -185,7 +198,7 @@ export function MatchSearcher() {
         {/* Mensaje de Error */}
         {error && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-8">
-            <p className="font-bold">Error</p>
+            <p className="font-bold">Notificación</p>
             <p className="text-sm mt-1">{error}</p>
           </div>
         )}
@@ -197,7 +210,7 @@ export function MatchSearcher() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
             </div>
             <p className="mt-4 text-slate-300 text-sm font-medium animate-pulse">
-              Analizando estadísticas y rendimiento de los equipos...
+              Consultando alineaciones, bajas y generando predicción cuantitativa...
             </p>
           </div>
         )}
@@ -208,8 +221,8 @@ export function MatchSearcher() {
         {/* Estado Inicial */}
         {!analysis && !error && !loading && (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <p className="text-gray-600 text-lg">Introduce dos equipos para comenzar el análisis</p>
-            <p className="text-gray-400 text-sm mt-2">Los datos se procesan en tiempo real para generar la mejor selección</p>
+            <p className="text-gray-600 text-lg font-medium">Ingresa dos equipos para comenzar</p>
+            <p className="text-gray-400 text-sm mt-2">El motor cuantitativo evaluará datos en tiempo real con OpenAI / Gemini</p>
           </div>
         )}
       </div>

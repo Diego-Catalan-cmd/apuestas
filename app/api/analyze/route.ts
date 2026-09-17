@@ -5,83 +5,73 @@ import { MatchRequest, ApiResponse, BettingAnalysis } from "@/lib/types";
 
 /**
  * POST /api/analyze
- * 
- * Endpoint que orquesta todo el flujo:
- * 1. Recibe la solicitud con nombres de equipos
- * 2. Consulta la API deportiva para obtener datos del partido
- * 3. Verifica si el partido es inminente (< 1.5 horas)
- * 4. Inyecta los datos en el Prompt Maestro
- * 5. Llama al LLM para obtener el análisis
- * 6. Devuelve el resultado estructurado
+ * Endpoint orquestador:
+ * 1. Procesa peticiones (soporta homeTeam/awayTeam y compatibilidad con teamA/teamB).
+ * 2. Consulta datos en API-Football.
+ * 3. Analiza el encuentro mediante el orquestador cuantitativo (OpenAI con fallback a Gemini/Groq).
+ * 4. Devuelve la predicción sin restricciones de cuotas artificiales.
  */
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse>> {
   try {
-    // Parsear solicitud
-    const body = await request.json() as MatchRequest;
-    const { teamA, teamB } = body;
+    const body = await request.json();
 
-    if (!teamA || !teamB) {
+    // Normalización de nombres (soporta el estándar homeTeam/awayTeam y legado teamA/teamB)
+    const homeTeam = body.homeTeam || body.teamA;
+    const awayTeam = body.awayTeam || body.teamB;
+
+    if (!homeTeam || !awayTeam) {
       return NextResponse.json(
         {
           success: false,
-          error: "Se requieren nombres de ambos equipos (teamA, teamB)",
+          error: "Se requieren los nombres de ambos equipos (homeTeam y awayTeam)",
         },
         { status: 400 }
       );
     }
 
-    // 1. Buscar el partido en la API deportiva
-    console.log(`Buscando partido: ${teamA} vs ${teamB}`);
-    const matchData = await searchMatch(teamA, teamB);
+    // 1. Obtención de estadísticas históricas y alineaciones
+    console.log(`[API] Buscando datos: ${homeTeam} vs ${awayTeam}`);
+    const matchData = await searchMatch(homeTeam, awayTeam);
 
     if (!matchData) {
       return NextResponse.json(
         {
           success: false,
-          error: `No se encontró el partido entre ${teamA} y ${teamB}`,
+          error: `No se encontraron datos para el partido entre ${homeTeam} y ${awayTeam}`,
         },
         { status: 404 }
       );
     }
 
-    // 2. Verificar tiempo hasta el partido
+    // 2. Control de ventana de tiempo previa al encuentro
     const hoursUntilMatch = getTimeUntilMatch(matchData.date, matchData.time);
     
-    console.log(`Partido encontrado: ${matchData.teamA} vs ${matchData.teamB}`);
-    console.log(`Horas hasta el partido: ${hoursUntilMatch.toFixed(2)}`);
+    console.log(`[API] Partido: ${matchData.homeTeam} vs ${matchData.awayTeam}`);
+    console.log(`[API] Horas restantes: ${hoursUntilMatch.toFixed(2)}h`);
 
     if (hoursUntilMatch > 1.5) {
       return NextResponse.json(
         {
           success: false,
-          error: `🟡 STANDBY - El partido queda en standby. Faltan ${hoursUntilMatch.toFixed(1)} horas. Espera 45 minutos antes del partido cuando salgan las alineaciones oficiales.`,
+          error: `🟡 STANDBY - Faltan ${hoursUntilMatch.toFixed(1)} horas. Vuelve 45 minutos antes del partido para contar con alineaciones confirmadas.`,
         },
-        { status: 202 } // 202 Accepted (operación en progreso)
+        { status: 202 }
       );
     }
 
-    // 3. Inyectar datos en el Prompt Maestro y analizar con LLM
-    console.log("Analizando con IA...");
+    // 3. Ejecución del modelo analítico cuantitativo
+    console.log("[API] Generando análisis cuantitativo con el Agente...");
     const analysis: BettingAnalysis = await analyzeMatch(matchData);
 
-    // 4. Validar que la cuota esté en rango permitido
-    if (analysis.estimatedOdds < 2.0 || analysis.estimatedOdds > 5.0) {
-      console.warn(
-        `Cuota fuera de rango: ${analysis.estimatedOdds}. Ajustando a 2.5`
-      );
-      analysis.estimatedOdds = 2.5;
-    }
-
-    // 5. Responder con el ticket de apuesta
+    // 4. Respuesta estructurada al cliente
     return NextResponse.json(
       {
         success: true,
         data: {
           ...analysis,
-          // Metadata adicional para el frontend
           matchInfo: {
-            teamA: matchData.teamA,
-            teamB: matchData.teamB,
+            homeTeam: matchData.homeTeam,
+            awayTeam: matchData.awayTeam,
             league: matchData.league,
             date: matchData.date,
             time: matchData.time,
@@ -91,15 +81,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       { status: 200 }
     );
   } catch (error) {
-    console.error("API Error:", error);
+    console.error("[API Error]:", error);
 
     const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido en la API";
+      error instanceof Error ? error.message : "Error desconocido en el servidor";
 
     return NextResponse.json(
       {
         success: false,
-        error: `Error procesando análisis: ${errorMessage}`,
+        error: `Error procesando el análisis: ${errorMessage}`,
       },
       { status: 500 }
     );
@@ -108,18 +98,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
 /**
  * GET /api/analyze
- * Endpoint de health check
+ * Endpoint de estado y documentación de la API
  */
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
     status: "ok",
-    message: "Endpoint de análisis de apuestas deportivas activo",
+    message: "Servicio de análisis cuantitativo de apuestas activo",
     usage: {
       method: "POST",
       path: "/api/analyze",
       body: {
-        teamA: "nombre del equipo local",
-        teamB: "nombre del equipo visitante",
+        homeTeam: "Nombre del equipo local",
+        awayTeam: "Nombre del equipo visitante",
       },
     },
   });
