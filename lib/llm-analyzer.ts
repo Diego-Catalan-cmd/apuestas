@@ -1,52 +1,60 @@
 // lib/llm-analyzer.ts
 import { OpenAI } from 'openai';
+import { CuponAnalisisResponse } from './types';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function analyzeMatches(partidos: any): Promise<any> {
+export async function analyzeMatches(partidos: any): Promise<CuponAnalisisResponse | null> {
   const promptSistema = `
     Actúa como un Analista de Datos de Élite y Pronosticador Cuantitativo especializado en Modelado Predictivo para Apuestas Deportivas de Fútbol.
     Tu objetivo es evaluar un cupón dinámico que contiene múltiples partidos de fútbol de forma simultánea.
 
-    INSTRUCCIONES DE ANÁLISIS DE DATOS:
-    1. Análisis Libre y sin Techos: Evalúa el rendimiento puro de los equipos sin restringirte a un rango de cuotas (elimina el techo de 2.00 a 5.00). Busca la probabilidad matemática más sólida.
-    2. Enfoque Multivariable: No te limites a quién gana el partido. Analiza y sugiere pronósticos libres en base a los datos para cualquiera de los siguientes mercados si encuentras valor real:
-        - Córneres Totales o por Equipo (Más/Menos)
-        - Tiros Totales o Tiros Directos al Arco (especificando si son del partido o de un equipo)
-        - Tarjetas Amarillas / Faltas Cometidas
-        - Ambos Equipos Anotan (Sí/No)
-        - Total de Goles del Partido (Líneas de Más/Menos de 1.5, 2.5, 3.5, etc.)
-        - Victoria Simple o Hándicaps
-    3. Contraste de Contexto y Competición: Evalúa si las rachas recientes de los equipos son sostenibles considerando la dificultad del rival actual y la importancia del torneo.
+    REGLA DE MULTI-SELECCIÓN (BET BUILDER POR PARTIDO):
+    Para CADA partido de la lista, debes sugerir entre 1 y 4 pronósticos/mercados diferentes (MÍNIMO 1, MÁXIMO 4 SELECCIONES POR PARTIDO).
+    - Explora diversos ángulos (goles, córneres, tarjetas, tiros a puerta, faltas o resultado).
+    - En partidos con mucha dinámica puedes sugerir 2, 3 o 4 selecciones (ej: 'Más de 2.5 goles totales' + 'Más de 8.5 córneres del partido' + 'Más de 3.5 tarjetas').
+    - En partidos más cerrados o específicos puedes sugerir solo 1 o 2 selecciones de máxima confianza.
+    - Cada selección individual dentro del mismo partido debe incluir su propia probabilidad estimada (%) y su justificación cuantitativa específica.
 
     REGLA DE PRECISIÓN DE MERCADO (OBLIGATORIA):
-    - En mercados de TIROS o REMATES: Especifica SIEMPRE si te refieres a "tiros totales" o "tiros a puerta / al arco", e indica EXPLÍCITAMENTE si la métrica es "del partido" o "de un equipo en específico".
-      Ejemplos de selecciones válidas y precisas: 
+    - En mercados de TIROS o REMATES: Especifica SIEMPRE si te refieres a "tiros totales" o "tiros a puerta / al arco", e indica EXPLÍCITAMENTE si es "del partido" o "de un equipo en específico".
+      Ejemplos válidos:
       * 'Más de 4.5 tiros al arco de Crystal Palace'
       * 'Más de 12.5 tiros totales de Crystal Palace'
       * 'Más de 22.5 tiros totales del partido'
       * 'Más de 8.5 tiros al arco totales del partido'
-      Jamás devuelvas un mercado ambiguo como 'Más de 18.5 tiros totales' sin definir si es del partido completo o de qué equipo.
+      Jamás devuelvas un mercado ambiguo sin definir si es del partido completo o de qué equipo.
     - Aplica esta misma claridad para CÓRNERES, TARJETAS y GOLES (ej: 'Más de 4.5 córneres de Flamengo RJ' o 'Más de 8.5 córneres totales del partido').
 
     REGLA DE FORMATO CRÍTICA:
-    Debes devolver la respuesta ESTRICTAMENTE en el siguiente formato de objeto JSON para que mi backend pueda parsearlo. No agregues texto de introducción ni cierres, solo el objeto JSON:
+    Debes devolver la respuesta ESTRICTAMENTE en el siguiente formato JSON para que el backend pueda parsearlo correctamente. No agregues texto introductorio ni explicaciones fuera del objeto JSON:
 
     {
       "cupon_analisis": [
         {
-          "partido": "Nombre del Partido (Ej: Manchester City vs FC Barcelona)",
-          "analisis_contextual": "Explicación concisa de 2 o 3 líneas detallando por qué la racha se mantiene o se frena, justificando el mercado elegido mediante estadísticas de córneres, tiros, goles o tarjetas.",
-          "pronostico_sugerido": "El mercado exacto recomendado (Ej: 'Más de 4.5 tiros al arco de Crystal Palace' o 'Más de 2.5 goles totales del partido')",
-          "probabilidad_estimada": 85, 
-          "confianza": "Alta" 
+          "partido": "Nombre del Partido (Ej: Celtic FC vs Ferencvarosi TC)",
+          "analisis_contextual": "Explicación macro del partido (2 o 3 líneas).",
+          "pronosticos": [
+            {
+              "pronostico_sugerido": "Ambos equipos anotan (Sí)",
+              "probabilidad_estimada": 85,
+              "confianza": "Alta",
+              "justificacion": "Racha goleadora de ambos y falencias defensivas en torneos continentales."
+            },
+            {
+              "pronostico_sugerido": "Más de 2.5 goles totales del partido",
+              "probabilidad_estimada": 80,
+              "confianza": "Alta",
+              "justificacion": "Promedio combinado de 3.4 goles por encuentro esta temporada."
+            }
+          ]
         }
       ],
       "combinada_sugerida": {
         "cuota_total_estimada": 3.45,
-        "justificacion_global": "Resumen estratégico de por qué estos pronósticos combinados arman un cupón inteligente de alta probabilidad."
+        "justificacion_global": "Resumen estratégico de por qué esta combinación de selecciones forma un ticket de alta probabilidad."
       }
     }
 
@@ -58,7 +66,7 @@ export async function analyzeMatches(partidos: any): Promise<any> {
       model: process.env.OPENAI_MODEL || 'gpt-4o',
       messages: [
         { role: 'system', content: promptSistema },
-        { role: 'user', content: `Analiza minuciosamente los siguientes partidos para armar el cupón: ${JSON.stringify(partidos)}` }
+        { role: 'user', content: `Analiza minuciosamente los siguientes partidos y genera los Bet Builders (1 a 4 selecciones por partido): ${JSON.stringify(partidos)}` }
       ],
       response_format: { type: "json_object" }
     });
@@ -66,28 +74,7 @@ export async function analyzeMatches(partidos: any): Promise<any> {
     const resultadoTexto = response.choices[0]?.message?.content;
     if (!resultadoTexto) return null;
 
-    const parsedData = JSON.parse(resultadoTexto);
-
-    if (parsedData.cupon_analisis && Array.isArray(parsedData.cupon_analisis)) {
-      const primerPartido = parsedData.cupon_analisis[0];
-
-      return {
-        ...parsedData,
-        summary: parsedData.combinada_sugerida?.justificacion_global || primerPartido?.analisis_contextual || "Análisis cuantitativo procesado correctamente.",
-        riskLevel: primerPartido?.confianza === "Alta" ? "Bajo" : "Medio",
-        riskJustification: "Basado en evaluación cuantitativa multivariable y contexto de competición.",
-        optimalSelection: primerPartido?.pronostico_sugerido || "Sin selección",
-        estimatedOdds: parsedData.combinada_sugerida?.cuota_total_estimada || 1.85,
-        analysisConfirmed: true,
-        markets: parsedData.cupon_analisis.map((item: any) => ({
-          market: item.partido,
-          selection: item.pronostico_sugerido,
-          odds: `${item.probabilidad_estimada}% Prob.`
-        })),
-        reasoning: parsedData.cupon_analisis.map((p: any) => `• ${p.partido}: ${p.analisis_contextual}`).join('\n\n')
-      };
-    }
-
+    const parsedData: CuponAnalisisResponse = JSON.parse(resultadoTexto);
     return parsedData;
   } catch (error) {
     console.error("Error crítico en la llamada a OpenAI:", error);

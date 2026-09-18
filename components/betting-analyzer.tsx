@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { CuponAnalisisResponse, CuponItem } from "@/lib/types";
+import { CuponAnalisisResponse, PartidoCupon, PronosticoItem } from "@/lib/types";
 
 interface MatchInput {
   id: string;
@@ -18,7 +18,6 @@ export default function BettingAnalyzer() {
   const [analysis, setAnalysis] = useState<CuponAnalisisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Manejadores para agregar/eliminar/actualizar partidos
   const handleAddMatch = () => {
     setMatches([
       ...matches,
@@ -45,7 +44,6 @@ export default function BettingAnalyzer() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Filtrar partidos vacíos
     const validMatches = matches.filter(
       (m) => m.homeTeam.trim() !== "" && m.awayTeam.trim() !== ""
     );
@@ -94,14 +92,14 @@ export default function BettingAnalyzer() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center justify-center gap-2">
-            ⚽ <span>Analizador de Apuestas</span>
+            ⚽ <span>Analizador de Apuestas IA</span>
           </h1>
           <p className="text-slate-400 text-sm">
-            Genera cupones y combinadas de alto valor con Inteligencia Artificial
+            Predicciones cuantitativas con Bet Builder dinámico (1 a 4 selecciones por partido)
           </p>
         </div>
 
-        {/* Formulario de Partidos Múltiples */}
+        {/* Formulario */}
         <form
           onSubmit={handleSubmit}
           className="bg-slate-800/80 backdrop-blur border border-slate-700/60 rounded-2xl p-5 shadow-xl space-y-4"
@@ -131,7 +129,7 @@ export default function BettingAnalyzer() {
 
                 <input
                   type="text"
-                  placeholder="Local (ej: Arsenal)"
+                  placeholder="Local (ej: Celtic FC)"
                   value={match.homeTeam}
                   onChange={(e) =>
                     handleMatchChange(match.id, "homeTeam", e.target.value)
@@ -144,7 +142,7 @@ export default function BettingAnalyzer() {
 
                 <input
                   type="text"
-                  placeholder="Visitante (ej: Chelsea)"
+                  placeholder="Visitante (ej: Ferencvarosi)"
                   value={match.awayTeam}
                   onChange={(e) =>
                     handleMatchChange(match.id, "awayTeam", e.target.value)
@@ -158,7 +156,6 @@ export default function BettingAnalyzer() {
                     type="button"
                     onClick={() => handleRemoveMatch(match.id)}
                     className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition"
-                    title="Eliminar partido"
                   >
                     ✕
                   </button>
@@ -172,47 +169,43 @@ export default function BettingAnalyzer() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-lg transition duration-200"
           >
-            {loading ? "⏳ Analizando Cupón con IA..." : "🔍 Analizar Combinada"}
+            {loading ? "⏳ Construyendo Bet Builders..." : "🔍 Analizar Combinada"}
           </button>
         </form>
 
-        {/* Error */}
         {error && (
           <div className="bg-red-950/80 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm">
             ⚠️ {error}
           </div>
         )}
 
-        {/* Loader */}
         {loading && (
           <div className="text-center py-10 space-y-3">
             <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
             <p className="text-slate-400 text-sm animate-pulse">
-              Evaluando córneres, tarjetas, goles y rachas de todos los partidos...
+              Evaluando estadísticas para armar mercados múltiples por partido...
             </p>
           </div>
         )}
 
-        {/* BOLETO DE APUESTA ESTILO BETANO */}
+        {/* Boleto de Apuestas Estilo Betano / Bet Builder */}
         {analysis && !loading && (
           <div className="bg-[#1e293b] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden font-sans">
-            {/* Header Betano */}
+            {/* Encabezado */}
             <div className="bg-gradient-to-r from-[#161f2c] to-[#1e293b] p-5 border-b border-slate-700/80">
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    Combinada de {analysis.cupon_analisis?.length || 1}
+                    Combinada Dinámica
                   </span>
                   <h2 className="text-xl font-extrabold text-white mt-1">
-                    🎯 Cupón Recomendado
+                    🎯 Ticket Bet Builder
                   </h2>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-400 font-medium">Cuota Total Est.</p>
                   <p className="text-3xl font-black text-emerald-400">
-                    {analysis.combinada_sugerida?.cuota_total_estimada ||
-                      analysis.estimatedOdds ||
-                      "2.50"}
+                    {analysis.combinada_sugerida?.cuota_total_estimada || "3.50"}
                   </p>
                 </div>
               </div>
@@ -225,46 +218,63 @@ export default function BettingAnalyzer() {
               )}
             </div>
 
-            {/* Lista de Selecciones en el Cupón */}
-            <div className="divide-y divide-slate-700/60">
-              {analysis.cupon_analisis?.map((item: CuponItem, idx: number) => (
-                <div
-                  key={idx}
-                  className="p-4 bg-slate-800/40 hover:bg-slate-800/70 transition space-y-2"
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs">
-                        ✓
-                      </span>
-                      <div>
-                        <p className="text-base font-bold text-white leading-tight">
-                          {item.pronostico_sugerido}
-                        </p>
-                        <p className="text-xs text-slate-400 font-medium mt-0.5">
-                          {item.partido}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right flex-shrink-0">
-                      <span className="inline-block bg-blue-500/10 text-blue-400 font-bold text-xs px-2 py-1 rounded-lg border border-blue-500/20">
-                        {item.probabilidad_estimada || 80}% Prob.
-                      </span>
-                    </div>
+            {/* Partidos y Selecciones Múltiples */}
+            <div className="divide-y divide-slate-700/80">
+              {analysis.cupon_analisis?.map((partidoItem: PartidoCupon, pIdx: number) => (
+                <div key={pIdx} className="p-4 bg-slate-800/30 space-y-3">
+                  {/* Título del partido */}
+                  <div className="flex justify-between items-center bg-slate-900/80 px-3.5 py-2 rounded-lg border border-slate-700/60">
+                    <span className="text-sm font-bold text-blue-400 flex items-center gap-2">
+                      ⚽ {partidoItem.partido}
+                    </span>
+                    <span className="text-[11px] bg-slate-800 text-slate-400 font-medium px-2 py-0.5 rounded border border-slate-700">
+                      {partidoItem.pronosticos?.length || 1} Selecciones
+                    </span>
                   </div>
 
-                  <p className="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800 leading-relaxed pl-8">
-                    {item.analisis_contextual}
-                  </p>
+                  {partidoItem.analisis_contextual && (
+                    <p className="text-xs text-slate-400 italic px-1">
+                      {partidoItem.analisis_contextual}
+                    </p>
+                  )}
+
+                  {/* Lista de Pronósticos del Partido (Bet Builder) */}
+                  <div className="space-y-2.5 pl-2 border-l-2 border-blue-500/40">
+                    {partidoItem.pronosticos?.map((item: PronosticoItem, sIdx: number) => (
+                      <div
+                        key={sIdx}
+                        className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/40 space-y-1.5"
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs flex-shrink-0">
+                              ✓
+                            </span>
+                            <span className="text-sm font-bold text-white">
+                              {item.pronostico_sugerido}
+                            </span>
+                          </div>
+                          <span className="bg-emerald-500/10 text-emerald-400 font-bold text-xs px-2 py-0.5 rounded border border-emerald-500/20 flex-shrink-0">
+                            {item.probabilidad_estimada}% Prob.
+                          </span>
+                        </div>
+
+                        {item.justificacion && (
+                          <p className="text-xs text-slate-300 leading-relaxed pl-7">
+                            {item.justificacion}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Footer Betano */}
+            {/* Pie de Boleto */}
             <div className="bg-[#131b26] p-4 text-center text-[11px] text-slate-500 border-t border-slate-700/80 space-y-1">
               <p>ID Análisis: #{Math.floor(100000000 + Math.random() * 900000000)}</p>
-              <p>⚠️ Este cupón es generado por modelos cuantitativos predictivos. Apuesta de forma responsable.</p>
+              <p>⚠️ Este análisis es cuantitativo e informativo. Apuesta de manera responsable.</p>
             </div>
           </div>
         )}
