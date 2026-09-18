@@ -11,11 +11,14 @@ export interface PronosticoItem {
   justificacion: string;
 }
 
-export interface CuponItem {
+export interface PartidoCupon {
   partido: string;
   analisis_contextual: string;
   pronosticos: PronosticoItem[];
 }
+
+// Alias por compatibilidad
+export type CuponItem = PartidoCupon;
 
 export interface CombinadaSugerida {
   cuota_total_estimada: number;
@@ -23,7 +26,7 @@ export interface CombinadaSugerida {
 }
 
 export interface CuponAnalisisResponse {
-  cupon_analisis: CuponItem[];
+  cupon_analisis: PartidoCupon[];
   combinada_sugerida: CombinadaSugerida;
 }
 
