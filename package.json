@@ -1,0 +1,34 @@
+{
+  "name": "betting-analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.58",
+    "@ducanh2912/next-pwa": "^10.2.9",
+    "axios": "^1.20.0",
+    "dotenv": "^17.4.2",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^1.47.0",
+    "next": "16.3.3",
+    "openai": "^7.17.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "swiper": "^14.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
