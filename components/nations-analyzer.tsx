@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Trophy, Globe, Flame, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { Trophy, Globe, Flame, AlertCircle, Plus, Trash2, Cpu } from "lucide-react";
 
 export default function NationsAnalyzer() {
   const [partidos, setPartidos] = useState<Array<{ homeTeam: string; awayTeam: string }>>([
@@ -11,19 +11,16 @@ export default function NationsAnalyzer() {
   const [resultado, setResultado] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Agregar una nueva fila de partido
   const addPartido = () => {
     setPartidos([...partidos, { homeTeam: "", awayTeam: "" }]);
   };
 
-  // Quitar un partido de la lista
   const removePartido = (index: number) => {
     if (partidos.length > 1) {
       setPartidos(partidos.filter((_, i) => i !== index));
     }
   };
 
-  // Actualizar el valor de un campo específico
   const updatePartido = (index: number, field: "homeTeam" | "awayTeam", value: string) => {
     const updated = [...partidos];
     updated[index][field] = value;
@@ -31,7 +28,6 @@ export default function NationsAnalyzer() {
   };
 
   const handleAnalizarNations = async () => {
-    // Filtrar los partidos que tengan ambos campos completos
     const partidosValidos = partidos.filter(
       (p) => p.homeTeam.trim() !== "" && p.awayTeam.trim() !== ""
     );
@@ -158,13 +154,13 @@ export default function NationsAnalyzer() {
         {loading ? (
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <span>Evaluando {partidos.length} partido(s)...</span>
+            <span>Analizando formaciones & esquemas tácticos...</span>
           </div>
         ) : (
           <>
             <Flame className="w-4 h-4 text-amber-300" />
             <span>
-              Analizar {partidos.length} Partido{partidos.length > 1 ? "s" : ""} de Selecciones
+              Analizar Táctica de {partidos.length} Partido{partidos.length > 1 ? "s" : ""}
             </span>
           </>
         )}
@@ -189,6 +185,14 @@ export default function NationsAnalyzer() {
                   Nations League
                 </span>
               </div>
+
+              {/* MUESTRA DEL ESQUEMA TÁCTICO */}
+              {item.esquema_tactico_estimado && (
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg w-fit">
+                  <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Sistemas Tácticos: {item.esquema_tactico_estimado}</span>
+                </div>
+              )}
 
               <p className="text-xs text-emerald-100/70 leading-relaxed">{item.analisis_contextual}</p>
 
