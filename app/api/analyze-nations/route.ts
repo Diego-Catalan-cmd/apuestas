@@ -23,49 +23,42 @@ export async function POST(req: Request) {
 
       REGLAS ESTRICTAS DE ANÁLISIS Y SEGURIDAD (OBLIGATORIAS):
 
-      1. PROHIBIDO UTILIZAR ENCUENTROS PREVIOS HISTÓRICOS (H2H):
-         - NO consideres enfrentamientos antiguos entre ambos seleccionados. Los H2H de años pasados quedan desactualizados y distorsionan el análisis actual.
+      1. PROHIBIDO INVENTAR O FABRICAR ESTADÍSTICAS (VERACIDAD OBLIGATORIA):
+         - Queda estrictamente PROHIBIDO inventar rachas de goles o marcadores ficticios (ejemplo: NUNCA afirmes que un equipo "marcó en sus últimos 4 partidos" si atraviesa sequía goleadora o bajo goleo).
+         - Si una selección tiene dificultades ofensivas o poca efectividad reciente (como Chile o Perú), refleja esa realidad objetiva y NUNCA recomiendes 'Más de 1.5 goles'. En su lugar, usa 'Doble Oportunidad (1X / X2)' del rival/favorito, 'Córneres' o 'Tarjetas'.
 
-      2. ANÁLISIS RECIENTE E INDIVIDUAL POR PAÍS:
-         - Analiza prioritariamente la racha RECIENTE e INDIVIDUAL de cada país en sus últimos partidos:
-           * Racha anotadora (Goles a favor recientes).
-           * Racha defensiva (Goles encajados en sus compromisos recientes).
-           * Promedio reciente de córneres totales por equipo.
-           * Tarjetas e intensidad del juego.
+      2. PROHIBIDO UTILIZAR ENCUENTROS PREVIOS HISTÓRICOS (H2H):
+         - NO consideres enfrentamientos antiguos entre ambos seleccionados. Los H2H de años pasados quedan desactualizados y distorsionan el análisis actual.
 
       3. SELECCIÓN DE MERCADOS DE ALTA CERTEZA Y PROBABILIDAD (>80%):
          - La "probabilidad_estimada" de cada pronóstico DEBE ser un número entre 80 y 95.
          - Queda estrictamente PROHIBIDO recomendar Hándicap (asiático o europeo).
-         - Queda estrictamente PROHIBIDO recomendar mercados de 'Menos de 2.5 goles', 'Menos de 1.5 goles' o 'Menos de 4.5 goles' por su alta volatilidad en partidos internacionales.
-         - PRIORIDAD DE MERCADOS DE ALTA CERTEZA:
-           * Cobertura Principal (PREFERIDO): 'Doble Oportunidad (1X)' o 'Doble Oportunidad (X2)' a favor de la selección con mejor racha, ritmo o solidez.
-           * Goles: 'Más de 1.5 goles totales', 'Más de 0.5 goles en 1T' o 'Ambos Anotan' (si la racha ofensiva de ambas selecciones es alta).
-           * Córneres: 'Más de 6.5 córneres totales' o 'Más de 7.5 córneres totales'.
-           * Tarjetas: 'Más de 1.5 o 2.5 tarjetas totales'.
+         - Queda estrictamente PROHIBIDO recomendar mercados de 'Menos de 2.5 goles', 'Menos de 1.5 goles' o 'Menos de 4.5 goles'.
+         - SI UN EQUIPO NO TIENE GOL: Prioriza 'Doble Oportunidad (1X / X2)' a favor del equipo más sólido, o mercados neutrales como 'Más de 6.5 córneres totales' o 'Más de 2.5 tarjetas totales'.
 
-      4. JUSTIFICACIÓN TÉCNICA BASADA EN LA RACHA DE CADA PAÍS:
-         - Cita explícitamente la racha reciente de goles o córneres de cada selección para sustentar la elección de Doble Oportunidad (1X / X2) o el mercado seleccionado.
+      4. JUSTIFICACIÓN TÉCNICA Y REALISTA:
+         - Justifica basándote en la realidad táctica y el perfil competitivo actual de los países sin asumir cuotas de gol irreales.
 
       DEVOLUCIÓN OBLIGATORIA EN JSON ESTRICTO:
       {
         "cupon_analisis": [
           {
-            "partido": "Nombre del Partido (Ej: Suiza vs Escocia)",
-            "esquema_tactico_estimado": "Ej: Suiza (4-2-3-1) vs Escocia (5-4-1)",
-            "analisis_contextual": "Explicación táctica detallando la racha reciente por país (ej: Suiza viene de marcar en sus últimos partidos pero concede goles, mientras Escocia sufre defensivamente como visitante).",
+            "partido": "Nombre del Partido (Ej: Chile vs EE.UU.)",
+            "esquema_tactico_estimado": "Ej: Chile (4-3-3) vs EE.UU. (4-3-3)",
+            "analisis_contextual": "Explicación táctica realista del momento actual de cada selección sin inventar estadísticas de goles.",
             "pronosticos": [
               {
-                "pronostico_sugerido": "Mercado de Alta Certeza (Ej: Doble Oportunidad 1X o Más de 1.5 Goles Totales)",
+                "pronostico_sugerido": "Mercado de Alta Certeza (Ej: Doble Oportunidad X2 o Más de 6.5 Córneres)",
                 "probabilidad_estimada": 85,
                 "confianza": "Alta",
-                "justificacion": "Sustento basado en la solidez/racha del seleccionado favorecido con 1X/X2 e indicadores recientes de ataque."
+                "justificacion": "Sustento táctico basado en la solidez del rival y la falta de efectividad del rival sin inventar marcadores."
               }
             ]
           }
         ],
         "combinada_sugerida": {
           "cuota_total_estimada": 2.15,
-          "justificacion_global": "Combinada Banker respaldada exclusivamente en Doble Oportunidad y métricas de racha por país con probabilidad individual > 80%."
+          "justificacion_global": "Combinada Banker respaldada exclusivamente en Doble Oportunidad y mercados de alta certidumbre con probabilidad individual > 80%."
         }
       }
     `;
@@ -76,7 +69,7 @@ export async function POST(req: Request) {
         { role: "system", content: promptSistema },
         {
           role: "user",
-          content: `Analiza la racha reciente por país (goles, córneres, forma) e ignora H2H histórico para los siguientes partidos de selecciones: ${JSON.stringify(partidos)}`,
+          content: `Analiza la realidad competitiva actual por país e ignora H2H histórico para los siguientes partidos de selecciones: ${JSON.stringify(partidos)}`,
         },
       ],
       response_format: { type: "json_object" },
