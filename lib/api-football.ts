@@ -1,5 +1,5 @@
 import axios from "axios";
-import { MatchData, OddsData, LineupsData, InjuriesData } from "./types";
+import { MatchData, OddsData, LineupsData } from "./types";
 
 const API_HOST = process.env.RAPIDAPI_HOST || "sportapi7.p.rapidapi.com";
 const API_KEY = process.env.RAPIDAPI_KEY || process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
@@ -14,7 +14,21 @@ const apiClient = axios.create({
 });
 
 /**
- * Busca un partido en SportAPI con respaldo automático para desarrollo
+ * Obtiene eventos en vivo directamente desde SportAPI7
+ */
+export async function getLiveMatchesFromSportAPI() {
+  if (!API_KEY) return [];
+  try {
+    const res = await apiClient.get("/sport/football/events/live");
+    return res.data?.events || [];
+  } catch (error: any) {
+    console.warn("SportAPI7: No se pudieron obtener los eventos en vivo.", error.message);
+    return [];
+  }
+}
+
+/**
+ * Busca un partido en SportAPI7 con barrido de categorías y respaldo automático
  */
 export async function searchMatch(teamA: string, teamB: string): Promise<MatchData> {
   try {
@@ -30,7 +44,7 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
       const categoriesRes = await apiClient.get(`/sport/football/${today}/0/categories`);
       const categories = categoriesRes.data?.categories || [];
 
-      // 2. Buscar el evento coincidente
+      // 2. Buscar evento coincidente
       for (const cat of categories) {
         if (targetEvent) break;
 
@@ -47,20 +61,20 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
             return (home.includes(tA) && away.includes(tB)) || (home.includes(tB) && away.includes(tA));
           });
         } catch {
-          continue; // Omitir categorías sin datos
+          continue;
         }
       }
     } catch {
       console.warn("SportAPI no retornó eventos activos para hoy. Usando datos de respaldo.");
     }
 
-    // 3. Si no existe en vivo/programado hoy en la API, usar datos simulados (12:30 hora local)
+    // 3. Respaldo si no existe el partido en la API hoy
     if (!targetEvent) {
       console.log(`Generando datos simulados para: ${teamA} vs ${teamB}`);
       return getFallbackMatchData(teamA, teamB, today);
     }
 
-    // 4. Obtener detalles extras si el evento existe
+    // 4. Cargar cuotas y alineaciones
     const eventId = targetEvent.id;
     const [oddsRes, lineupRes] = await Promise.allSettled([
       apiClient.get(`/event/${eventId}/odds`),
@@ -89,7 +103,7 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
 }
 
 /**
- * Calcula las horas restantes usando Timestamp UNIX
+ * Calcula las horas restantes hasta el inicio del partido
  */
 export function getTimeUntilMatch(
   dateOrTimestamp?: string | number,
@@ -97,12 +111,10 @@ export function getTimeUntilMatch(
 ): number {
   const now = Date.now();
 
-  // Si recibe un timestamp UNIX numérico válido
   if (typeof dateOrTimestamp === "number" && !isNaN(dateOrTimestamp)) {
     return (dateOrTimestamp * 1000 - now) / (1000 * 60 * 60);
   }
 
-  // Si recibe fecha en formato string ("2026-08-31")
   if (typeof dateOrTimestamp === "string" && dateOrTimestamp) {
     const timeStr = matchTime || "12:30";
     const matchDateTime = new Date(`${dateOrTimestamp}T${timeStr}:00`);
@@ -110,18 +122,10 @@ export function getTimeUntilMatch(
     if (!isNaN(diff)) return diff;
   }
 
-  // Respaldo por defecto
   return 2.2;
 }
 
-/**
- * Mock data con hora fijada a las 12:30 PM local
- */
 function getFallbackMatchData(teamA: string, teamB: string, date: string): MatchData {
-  const todayAt1230 = new Date();
-  todayAt1230.setHours(12, 30, 0, 0);
-  const startTimestampInSeconds = Math.floor(todayAt1230.getTime() / 1000);
-
   return {
     matchId: "mock-101",
     teamA: teamA.toUpperCase(),
@@ -143,7 +147,7 @@ function getFallbackMatchData(teamA: string, teamB: string, date: string): Match
       awayTeam: { formation: "4-4-2", players: [] },
     },
     injuries: {
-      homeTeam: [{ player: "Portero Titular", type: "Lesión Muscular", returnDate: "Próxima semana" }],
+      homeTeam: [{ player: "Jugador Clave", type: "Molestia Muscular", returnDate: "En evaluación" }],
       awayTeam: [],
     },
   };

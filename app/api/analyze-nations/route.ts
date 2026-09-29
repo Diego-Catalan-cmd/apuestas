@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       REGLAS ESTRICTAS DE ANÁLISIS Y SEGURIDAD (OBLIGATORIAS):
 
       1. PROHIBIDO INVENTAR O FABRICAR ESTADÍSTICAS (VERACIDAD OBLIGATORIA):
-         - Queda estrictamente PROHIBIDO inventar rachas de goles o marcadores ficticios (ejemplo: NUNCA afirmes que un equipo "marcó en sus últimos 4 partidos" si atraviesa sequía goleadora o bajo goleo).
+         - Queda strictly PROHIBIDO inventar rachas de goles o marcadores ficticios (ejemplo: NUNCA afirmes que un equipo "marcó en sus últimos 4 partidos" si atraviesa sequía goleadora o bajo goleo).
          - Si una selección tiene dificultades ofensivas o poca efectividad reciente (como Chile o Perú), refleja esa realidad objetiva y NUNCA recomiendes 'Más de 1.5 goles'. En su lugar, usa 'Doble Oportunidad (1X / X2)' del rival/favorito, 'Córneres' o 'Tarjetas'.
 
       2. PROHIBIDO UTILIZAR ENCUENTROS PREVIOS HISTÓRICOS (H2H):
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
                 "pronostico_sugerido": "Mercado de Alta Certeza (Ej: Doble Oportunidad X2 o Más de 6.5 Córneres)",
                 "probabilidad_estimada": 85,
                 "confianza": "Alta",
-                "justificacion": "Sustento táctico basado en la solidez del rival y la falta de efectividad del rival sin inventar marcadores."
+                "justificacion": "Sustento táctico basado en la solidez del rival y la falta de efectividad de la selección sin inventar marcadores."
               }
             ]
           }

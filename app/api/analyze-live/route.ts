@@ -1,218 +1,153 @@
 import { NextResponse } from "next/server";
+import { getLiveMatchesFromSportAPI } from "@/lib/api-football";
+import { OpenAI } from "openai";
 
-// Función auxiliar para convertir las estadísticas de RapidAPI a un texto claro para la IA
-function formatStatsForPrompt(statsArray: any[]): string {
-  if (!statsArray || !Array.isArray(statsArray) || statsArray.length === 0) {
-    return "Estadísticas detalladas no disponibles.";
-  }
+export const dynamic = "force-dynamic";
 
-  return statsArray
-    .map((teamStats) => {
-      const teamName = teamStats.team?.name || "Equipo";
-      const statsList = teamStats.statistics || [];
-      const formattedList = statsList
-        .map((s: any) => `${s.type}: ${s.value ?? 0}`)
-        .join(", ");
-      return `${teamName} -> [${formattedList}]`;
-    })
-    .join("\n");
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
-    const { partido } = await req.json();
+    const body = await req.json();
 
-    if (!partido || partido.trim() === "") {
+    let searchString = "";
+    if (typeof body.partido === "string" && body.partido.trim() !== "") {
+      searchString = body.partido.trim();
+    } else if (Array.isArray(body.partidos) && body.partidos.length > 0) {
+      const p = body.partidos[0];
+      searchString = `${p.homeTeam || p.local || ""} vs ${p.awayTeam || p.visitante || ""}`.trim();
+    } else if (body.homeTeam && body.awayTeam) {
+      searchString = `${body.homeTeam} vs ${body.awayTeam}`;
+    }
+
+    if (!searchString || searchString === "vs") {
       return NextResponse.json(
-        { success: false, error: "Ingresa el nombre de los equipos o el partido." },
+        { success: false, error: "Por favor, ingresa los nombres de los equipos para el análisis en vivo." },
         { status: 400 }
       );
     }
 
-    let liveMatchData: any = null;
-    let rapidApiErrorReason: string | null = null;
+    // 1. OBTENER EVENTOS EN VIVO DESDE SPORTAPI7
+    const liveEvents = await getLiveMatchesFromSportAPI();
+    let matchContext = null;
 
-    // 1. OBTENER DATOS Y ESTADÍSTICAS EN VIVO
-    if (process.env.RAPIDAPI_KEY) {
+    if (liveEvents.length > 0) {
+      const liveListSummary = liveEvents.map((e: any) => ({
+        id: e.id,
+        partido: `${e.homeTeam?.name} vs ${e.awayTeam?.name}`,
+        torneo: e.tournament?.name || "Desconocido",
+        minuto: e.status?.description || e.time?.currentPeriodStart || "En juego",
+        marcador: `${e.homeScore?.current ?? 0} - ${e.awayScore?.current ?? 0}`,
+      }));
+
+      // Intentar vincular con OpenAI si está en la lista de SportAPI7
       try {
-        const rapidRes = await fetch(
-          "https://api-football-v1.p.rapidapi.com/v3/fixtures?live=all",
-          {
-            headers: {
-              "X-RapidAPI-Key": process.env.RAPIDAPI_KEY,
-              "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com",
+        const matchFinderRes = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "Identifica qué evento de la lista corresponde a la búsqueda. Devuelve un JSON: {\"matchedId\": number | null}.",
             },
-            next: { revalidate: 0 },
+            {
+              role: "user",
+              content: `Búsqueda: "${searchString}". Lista en vivo: ${JSON.stringify(liveListSummary)}`,
+            },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0,
+        });
+
+        const matchedJson = JSON.parse(matchFinderRes.choices[0].message.content || "{}");
+        if (matchedJson.matchedId) {
+          const matchedEvent = liveEvents.find((e: any) => e.id === matchedJson.matchedId);
+          if (matchedEvent) {
+            matchContext = {
+              partidoOficial: `${matchedEvent.homeTeam?.name} vs ${matchedEvent.awayTeam?.name}`,
+              minuto: matchedEvent.status?.description || "In-Play",
+              marcador: `${matchedEvent.homeScore?.current ?? 0} - ${matchedEvent.awayScore?.current ?? 0}`,
+              torneo: matchedEvent.tournament?.name,
+            };
           }
-        );
-
-        if (rapidRes.ok) {
-          const rapidJson = await rapidRes.json();
-          const liveFixtures = rapidJson.response || [];
-
-          if (liveFixtures.length > 0) {
-            const partidosSimplificados = liveFixtures.map((f: any) => ({
-              id: f.fixture.id,
-              partido: `${f.teams.home.name} vs ${f.teams.away.name}`,
-              minuto: f.fixture.status.elapsed,
-              marcador: `${f.goals.home ?? 0} - ${f.goals.away ?? 0}`,
-            }));
-
-            const matchFinderRes = await fetch("https://api.openai.com/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              },
-              body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: [
-                  {
-                    role: "system",
-                    content: "Identifica qué partido corresponde a la búsqueda. Devuelve un JSON: {\"matchedId\": number | null}.",
-                  },
-                  {
-                    role: "user",
-                    content: `Búsqueda: "${partido}". Lista en vivo: ${JSON.stringify(partidosSimplificados)}`,
-                  },
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0,
-              }),
-            });
-
-            if (matchFinderRes.ok) {
-              const matchFinderData = await matchFinderRes.json();
-              const matchedJson = JSON.parse(matchFinderData.choices[0].message.content);
-              const matchedId = matchedJson.matchedId;
-
-              if (matchedId) {
-                const fixtureEncontrado = liveFixtures.find((f: any) => f.fixture.id === matchedId);
-                if (fixtureEncontrado) {
-                  let statsDetail = null;
-                  try {
-                    const statsRes = await fetch(
-                      `https://api-football-v1.p.rapidapi.com/v3/fixtures/statistics?fixture=${matchedId}`,
-                      {
-                        headers: {
-                          "X-RapidAPI-Key": process.env.RAPIDAPI_KEY,
-                          "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com",
-                        },
-                      }
-                    );
-                    if (statsRes.ok) {
-                      const statsData = await statsRes.json();
-                      statsDetail = statsData.response;
-                    }
-                  } catch (e) {
-                    console.warn("No se cargaron estadísticas detalladas.");
-                  }
-
-                  liveMatchData = {
-                    partidoOficial: `${fixtureEncontrado.teams.home.name} vs ${fixtureEncontrado.teams.away.name}`,
-                    minuto: fixtureEncontrado.fixture.status.elapsed,
-                    marcador: `${fixtureEncontrado.goals.home ?? 0} - ${fixtureEncontrado.goals.away ?? 0}`,
-                    statsFormatted: formatStatsForPrompt(statsDetail),
-                  };
-                }
-              }
-            }
-          }
-        } else {
-          rapidApiErrorReason = `Error HTTP ${rapidRes.status} de RapidAPI.`;
         }
-      } catch (err: any) {
-        rapidApiErrorReason = err.message;
+      } catch (e) {
+        console.warn("No se pudo matchear automáticamente el evento en vivo.");
       }
     }
 
-    // 2. PROMPT CON REGLA ESTRICTA DE LÍNEAS FUTURAS EN VIVO
+    // 2. PROMPT IN-PLAY CON REGLA ESTRICTA DE LIGAS Y MERCADOS FUTUROS
     const systemPrompt = `
-      Eres un In-Play Trader cuantitativo experto. Tu función es analizar partidos en vivo y proponer mercados de apuestas IN-PLAY que AÚN NO HANYA SUCEDIDO.
+      Eres un In-Play Trader cuantitativo experto en apuestas en vivo.
+      ALCANCE DE LIGAS PERMITIDAS EN ESTA SECCIÓN:
+      - Champions League, La Liga (España), Bundesliga (Alemania), Premier League (Inglaterra).
+      - UEFA Nations League y Fechas FIFA.
+      - Ligas locales exclusivamente de: CHILE (Primera División/Copa Chile), BRASIL (Brasileirão/Copa do Brasil) y ARGENTINA (Liga Profesional/Copa de la Liga).
 
-      REGLAS DE ORO OBLIGATORIAS:
-      1. REVISA LAS ESTADÍSTICAS ACUMULADAS EN EL MINUTO ACTUAL.
-      2. JAMÁS recomiendes un mercado o línea que ya se haya alcanzado o superado.
-         - Ejemplo INCORRECTO: Si el equipo local ya tiene 3 tarjetas rojas/amarillas en el minuto 70, NO sugieras "Más de 2.5 tarjetas".
-         - Ejemplo CORRECTO: "Más de 3.5 tarjetas totales" o "1+ tarjeta para el equipo local entre el min 70-90".
-      3. Todas las cuotas y sugerencias deben basarse exclusivamente en LO QUE FALTA POR OCURRIR desde el minuto actual hasta el final del partido.
+      REGLAS CRÍTICAS DE ANÁLISIS EN VIVO:
+      1. Solo debes proponer mercados sobre EVENTOS FUTUROS (lo que ocurrirá desde el minuto actual hasta el final).
+      2. NUNCA sugieras una línea que ya fue alcanzada en el partido.
+      3. Propon estadísticas de alta certidumbre en córneres adicionados, tarjetas finales o goles en el tramo restante.
 
-      MERCADOS DIVERSIFICADOS A CONSIDERAR:
-      - Córneres en el tiempo restante (Ej: "Más de 2.5 córneres adicionales para [Equipo]").
-      - Tarjetas adicionales por desesperación o faltas al final del partido.
-      - Tiros a puerta adicionales en el tramo final.
-      - Próximo Gol / Resultado Resto del Partido (Asian Handicap In-Play).
-
-      Responde EXCLUSIVAMENTE en formato JSON estricto:
+      DEVUELVE UN JSON ESTRICTO CON LA SIGUIENTE ESTRUCTURA:
       {
-        "partido": "Nombre del Partido",
-        "minuto": 70,
+        "partido": "${searchString}",
+        "minuto": 65,
         "marcadorActual": "1-0",
         "nivelRiesgo": "Bajo" | "Medio" | "Alto",
         "pronosticoPrincipal": {
-          "mercado": "Córneres / Tarjetas / Tiros / Goles en Tiempo Restante",
-          "seleccion": "Línea futura exacta (Ej: 'Atlético Nacional hará +2.5 córneres en los minutos restantes')",
+          "mercado": "Córneres / Tarjetas / Goles en Tiempo Restante",
+          "seleccion": "Línea futura precisa (Ej: '+2.5 córneres para el equipo local en los min restantes')",
           "cuotaEstimada": 1.85,
-          "probabilidadEstimada": 80
+          "probabilidadEstimada": 82
         },
         "mercadosAlternativos": [
           {
-            "categoria": "Córneres" | "Tarjetas" | "Tiros" | "Goles",
-            "sugerencia": "Sugerencia estricta para los minutos restantes",
-            "confianza": "Alta" | "Media"
+            "categoria": "Córneres" | "Tarjetas" | "Goles",
+            "sugerencia": "Sugerencia in-play concreta",
+            "confianza": "Alta"
           }
         ],
-        "analisisMomentum": "Explicación detallada justificando por qué ocurrirán estos eventos adicionales en los minutos restantes con base en el marcador y la presión.",
-        "recomendacionStake": "Stake sugerido para el tramo final (Ej: Stake 1.5/5 por minuto avanzado)"
+        "analisisMomentum": "Explicación del ritmo de juego y presión ofensiva en los minutos finales.",
+        "recomendacionStake": "Stake sugerido (Ej: Stake 1.5/5)"
       }
     `;
 
-    const userPrompt = liveMatchData
+    const userPrompt = matchContext
       ? `
-        DATOS REALES DEL PARTIDO EN EL MINUTO ${liveMatchData.minuto}':
-        - Encuentro: ${liveMatchData.partidoOficial}
-        - Minuto Actual: ${liveMatchData.minuto}'
-        - Marcador en Vivo: ${liveMatchData.marcador}
-        
-        ESTADÍSTICAS ACUMULADAS HASTA ESTE MINUTO:
-        ${liveMatchData.statsFormatted}
+        DATOS DE SPORTAPI7 EN VIVO:
+        - Partido: ${matchContext.partidoOficial}
+        - Torneo: ${matchContext.torneo}
+        - Minuto/Estado: ${matchContext.minuto}
+        - Marcador en vivo: ${matchContext.marcador}
 
-        RECUERDA: Propón únicamente apuestas sobre lo que pasará DESDE el minuto ${liveMatchData.minuto}' en adelante. No sugieras líneas por debajo de los acumulados actuales.
+        Genera el análisis In-Play sobre lo que ocurrirá en el tiempo restante.
       `
       : `
-        ANÁLISIS DE PARTIDO EN VIVO:
-        - Partido solicitado: ${partido}
-        - Nota: ${rapidApiErrorReason || "Genera un análisis in-play proyectando únicamente eventos futuros para el tramo final del partido."}
+        ANÁLISIS DE PARTIDO EN VIVO SOLICITADO:
+        - Partido: ${searchString}
+        
+        No se detectó el partido en la API en tiempo real en este instante; genera una proyección in-play cuantitativa estándar basada en la tendencia habitual del tramo final para ambos equipos.
       `;
 
-    const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-      }),
+    const openAiRes = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
     });
 
-    if (!openAiRes.ok) {
-      throw new Error("Error de comunicación con el motor de Inteligencia Artificial.");
-    }
-
-    const openAiData = await openAiRes.json();
-    const result = JSON.parse(openAiData.choices[0].message.content);
+    const result = JSON.parse(openAiRes.choices[0].message.content || "{}");
 
     return NextResponse.json({ success: true, data: result });
   } catch (err: any) {
+    console.error("Error en /api/analyze-live:", err);
     return NextResponse.json(
-      { success: false, error: err.message || "Error al procesar el análisis." },
+      { success: false, error: err.message || "Error procesando el análisis en vivo." },
       { status: 500 }
     );
   }
