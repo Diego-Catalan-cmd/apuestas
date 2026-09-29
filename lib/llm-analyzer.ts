@@ -48,10 +48,12 @@ export async function analyzeMatches(partidos: MatchAnalysisInput[]) {
          d) Faltas e intensidad (Tarjetas).
 
     3. SELECCIÓN DE MERCADOS DE ALTA CERTEZA (>80% PROBABILIDAD):
+       - Queda estrictamente PROHIBIDO recomendar Hándicap Asiático o Hándicap de cualquier tipo.
        - Si la racha de ambos países muestra partidos dinámicos y con goles encajados/anotados, NO recomiendes 'Menos de 2.5' o 'Menos de 4.5' por defecto. Recomienda mercados realistas apoyados en la racha:
-         * Goles: 'Más de 1.5 goles totales', 'Más de 2.0 goles asiáticos', 'Ambos Anotan' o 'Más de 0.5 goles en 1T'.
+         * Goles: 'Más de 1.5 goles totales', 'Ambos Anotan' o 'Más de 0.5 goles en 1T'.
          * Córneres: 'Más de 6.5 córneres totales' o 'Más de 7.5 córneres totales'.
-         * Oportunidad / Hándicap: 'Doble Oportunidad (1X / X2)', 'Hándicap Asiático +1.5 / +2.0'.
+         * Oportunidad / Cobertura: 'Doble Oportunidad (1X / X2)'.
+         * Tarjetas: 'Más de 1.5 o 2.5 tarjetas totales'.
        - Cada selección individual DEBE tener una 'probabilidad_estimada' numérica igual o superior a 80 (entre 80% y 95%).
 
     4. JUSTIFICACIÓN BASADA EN DATOS REALES DE RACHA:
@@ -63,7 +65,7 @@ export async function analyzeMatches(partidos: MatchAnalysisInput[]) {
         {
           "partido": "Nombre del Partido (Ej: España vs Croacia)",
           "esquema_tactico_estimado": "Formación estimada según ritmo actual (Ej: España 4-3-3 ofensivo vs Croacia 4-3-3)",
-          "analisis_contextual": "Explicación detallada de la racha de cada país. Ejemplo: España promedia 2.4 goles a favor en sus últimos 5 encuentros y viene de encajar 2 goles ante Inglaterra, mientras Croacia muestra desajustes en balones parados.",
+          "analisis_contextual": "Explicación detallada de la racha de cada país. Ejemplo: España promedia 2.4 goles a favor en sus últimos 5 encuentros y viene de encajar 2 goles ante Inglaterra, mientras Croacia muestra desajustes defensivos.",
           "pronosticos": [
             {
               "pronostico_sugerido": "Mercado de Alta Certeza (Ej: Más de 1.5 Goles Totales o Más de 7.5 Córneres)",
