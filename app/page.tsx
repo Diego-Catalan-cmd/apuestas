@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import BettingAnalyzer from "@/components/betting-analyzer";
-import LiveAnalyzer from "@/components/live-analyzer";
+import { LiveAnalyzer } from "@/components/live-analyzer";
 import NationsAnalyzer from "@/components/nations-analyzer";
 import { Calendar, Trophy } from "lucide-react";
 
