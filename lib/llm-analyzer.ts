@@ -31,7 +31,7 @@ export async function analyzeMatches(partidos: MatchAnalysisInput[], section: "p
 
   const ligasPermitidas = section === "nations"
     ? "UEFA Nations League y Fechas FIFA."
-    : "Champions League, La Liga (España), Bundesliga (Alemania) y Premier League (Inglaterra).";
+    : "Champions League, La Liga (España), Bundesliga (Alemania), Premier League (Inglaterra) y ligas de Chile, Brasil, Argentina y Colombia.";
 
   const promptSistema = `
     Actúa como un Analista Cuantitativo Deportivo de Alto Rendimiento experto en Apuestas y Estadística de Fútbol.
@@ -52,8 +52,8 @@ export async function analyzeMatches(partidos: MatchAnalysisInput[], section: "p
          d) Intensidad y Faltas (Tarjetas).
 
     3. SELECCIÓN DE MERCADOS DE ALTA CERTEZA (>80% PROBABILIDAD):
-       - Queda estrictamente PROHIBIDO recomendar Hándicap Asiático o Hándicap de cualquier tipo.
-       - Queda estrictamente PROHIBIDO recomendar 'Menos de 2.5', 'Menos de 1.5' o 'Menos de 4.5' si los equipos muestran dinámica ofensiva constante.
+       - Queda strictly PROHIBIDO recomendar Hándicap Asiático o Hándicap de cualquier tipo.
+       - Queda strictly PROHIBIDO recomendar 'Menos de 2.5', 'Menos de 1.5' o 'Menos de 4.5' si los equipos muestran dinámica ofensiva constante.
        - Recomienda mercados con alto respaldo estadístico:
          * Goles: 'Más de 1.5 goles totales', 'Ambos Anotan' o 'Más de 0.5 goles en 1T'.
          * Córneres: 'Más de 6.5 córneres totales' o 'Más de 7.5 córneres totales'.
@@ -68,8 +68,8 @@ export async function analyzeMatches(partidos: MatchAnalysisInput[], section: "p
     {
       "cupon_analisis": [
         {
-          "partido": "Nombre del Partido (Ej: España vs Croacia)",
-          "esquema_tactico_estimado": "Formación estimada (Ej: España 4-3-3 vs Croacia 4-3-3)",
+          "partido": "Nombre del Partido (Ej: Atlético Nacional vs Millonarios)",
+          "esquema_tactico_estimado": "Formación estimada (Ej: 4-2-3-1 vs 4-3-3)",
           "analisis_contextual": "Explicación detallada de la racha individual de cada equipo.",
           "pronosticos": [
             {

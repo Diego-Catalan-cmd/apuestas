@@ -14,7 +14,6 @@ import {
   Download,
   Flame,
   Activity,
-  Globe,
 } from "lucide-react";
 import { toPng } from "html-to-image";
 
@@ -129,7 +128,7 @@ export default function LiveAnalyzer() {
 
     let texto = `🔴 *ANÁLISIS IN-PLAY EN VIVO*\n`;
     texto += `⚔️ *${resultado.partido || "Partido"}*\n`;
-    if (resultado.minuto) texto += `⏱️ Minuto: ${resultado.minuto}' | Marcador: ${resultado.marcadorActual || "N/A"}\n`;
+    if (resultado.minuto) texto += `⏱️️ Minuto: ${resultado.minuto}' | Marcador: ${resultado.marcadorActual || "N/A"}\n`;
     if (resultado.pronosticoPrincipal) {
       texto += `🎯 *Pronóstico In-Play:* ${resultado.pronosticoPrincipal.seleccion}\n`;
       texto += `📈 Cuota Est.: @${resultado.pronosticoPrincipal.cuotaEstimada || "1.80"} (${resultado.pronosticoPrincipal.probabilidadEstimada}% Prob.)\n`;
@@ -162,7 +161,7 @@ export default function LiveAnalyzer() {
 
           <p className="text-xs sm:text-sm text-emerald-100/60 px-2">
             Proyección cuantitativa para los minutos restantes <br className="hidden sm:inline" />
-            <span className="text-rose-300/80 font-medium">(Champions, Top 4 Europa, Nations League + Chile, Brasil, Argentina)</span>
+            <span className="text-rose-300/80 font-medium">(Champions, Top 4 Europa, Nations League + Chile, Brasil, Argentina, Colombia)</span>
           </p>
         </div>
 
@@ -211,7 +210,7 @@ export default function LiveAnalyzer() {
                 <div className="flex items-center gap-2 w-full">
                   <input
                     type="text"
-                    placeholder="Local (ej: Colo-Colo / Flamengo / Real Madrid)"
+                    placeholder="Local (ej: Atl. Nacional / Colo-Colo / Flamengo / Real Madrid)"
                     value={partido.local}
                     onChange={(e) => updatePartido(index, "local", e.target.value)}
                     className="w-full bg-[#06130E] border border-[#278D7D]/30 focus:border-rose-400 rounded-xl px-3 py-2 text-xs text-white placeholder-emerald-100/30 outline-none transition-all"
@@ -223,7 +222,7 @@ export default function LiveAnalyzer() {
 
                   <input
                     type="text"
-                    placeholder="Visitante (ej: U. de Chile / Palmeiras / Barcelona)"
+                    placeholder="Visitante (ej: Millonarios / U. de Chile / Palmeiras / Barcelona)"
                     value={partido.visitante}
                     onChange={(e) => updatePartido(index, "visitante", e.target.value)}
                     className="w-full bg-[#06130E] border border-[#278D7D]/30 focus:border-rose-400 rounded-xl px-3 py-2 text-xs text-white placeholder-emerald-100/30 outline-none transition-all"

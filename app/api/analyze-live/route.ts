@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         marcador: `${e.homeScore?.current ?? 0} - ${e.awayScore?.current ?? 0}`,
       }));
 
-      // Intentar vincular con OpenAI si está en la lista de SportAPI7
+      // Vinculación inteligente con OpenAI
       try {
         const matchFinderRes = await openai.chat.completions.create({
           model: "gpt-4o-mini",
@@ -77,13 +77,13 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. PROMPT IN-PLAY CON REGLA ESTRICTA DE LIGAS Y MERCADOS FUTUROS
+    // 2. PROMPT IN-PLAY CON INCLUSIÓN DE COLOMBIA EN LIGAS PERMITIDAS
     const systemPrompt = `
       Eres un In-Play Trader cuantitativo experto en apuestas en vivo.
       ALCANCE DE LIGAS PERMITIDAS EN ESTA SECCIÓN:
       - Champions League, La Liga (España), Bundesliga (Alemania), Premier League (Inglaterra).
       - UEFA Nations League y Fechas FIFA.
-      - Ligas locales exclusivamente de: CHILE (Primera División/Copa Chile), BRASIL (Brasileirão/Copa do Brasil) y ARGENTINA (Liga Profesional/Copa de la Liga).
+      - Ligas locales exclusivamente de: CHILE (Primera División/Copa Chile), BRASIL (Brasileirão/Copa do Brasil), ARGENTINA (Liga Profesional/Copa de la Liga) y COLOMBIA (Liga BetPlay / Copa Colombia).
 
       REGLAS CRÍTICAS DE ANÁLISIS EN VIVO:
       1. Solo debes proponer mercados sobre EVENTOS FUTUROS (lo que ocurrirá desde el minuto actual hasta el final).
