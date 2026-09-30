@@ -42,7 +42,6 @@ export async function POST(req: Request) {
         marcador: `${e.homeScore?.current ?? 0} - ${e.awayScore?.current ?? 0}`,
       }));
 
-      // Vinculación inteligente con OpenAI
       try {
         const matchFinderRes = await openai.chat.completions.create({
           model: "gpt-4o-mini",
@@ -77,18 +76,19 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. PROMPT IN-PLAY CON INCLUSIÓN DE COLOMBIA EN LIGAS PERMITIDAS
+    // 2. PROMPT IN-PLAY AMPLIADO
     const systemPrompt = `
       Eres un In-Play Trader cuantitativo experto en apuestas en vivo.
       ALCANCE DE LIGAS PERMITIDAS EN ESTA SECCIÓN:
-      - Champions League, La Liga (España), Bundesliga (Alemania), Premier League (Inglaterra).
-      - UEFA Nations League y Fechas FIFA.
-      - Ligas locales exclusivamente de: CHILE (Primera División/Copa Chile), BRASIL (Brasileirão/Copa do Brasil), ARGENTINA (Liga Profesional/Copa de la Liga) y COLOMBIA (Liga BetPlay / Copa Colombia).
+      - Champions League (Masculina y Femenina - UWCL).
+      - Ligas Top Europa: La Liga (España), Bundesliga (Alemania), Premier League (Inglaterra).
+      - Selecciones: UEFA Nations League y Fechas FIFA.
+      - Ligas de América: Chile, Brasil, Argentina, Colombia, Perú (Liga 1), Uruguay (Liga AUF) y EE.UU. (MLS / NWSL Femenina).
 
       REGLAS CRÍTICAS DE ANÁLISIS EN VIVO:
       1. Solo debes proponer mercados sobre EVENTOS FUTUROS (lo que ocurrirá desde el minuto actual hasta el final).
       2. NUNCA sugieras una línea que ya fue alcanzada en el partido.
-      3. Propon estadísticas de alta certidumbre en córneres adicionados, tarjetas finales o goles en el tramo restante.
+      3. En Fútbol Femenino, considera la mayor propensión a córneres consecutivos del equipo dominador y tramos con alto volumen de tiros a puerta.
 
       DEVUELVE UN JSON ESTRICTO CON LA SIGUIENTE ESTRUCTURA:
       {
