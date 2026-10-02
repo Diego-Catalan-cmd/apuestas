@@ -29,16 +29,23 @@ export async function POST(req: Request) {
 
     if (!searchString || searchString === "vs") {
       return NextResponse.json(
-        { success: false, error: "Por favor, ingresa los nombres de los equipos para el análisis en vivo." },
+        { success: false, error: "Por favor, ingresa el nombre de los equipos." },
         { status: 400 }
       );
     }
 
-    // 1. INTENTAR OBTENER DATOS EN REAL-TIME DESDE SPORTAPI7
-    const liveEvents = await getLiveMatchesFromSportAPI();
+    // 1. OBTENER EVENTOS EN VIVO Y DEPURAR
+    let liveEvents: any[] = [];
+    try {
+      liveEvents = await getLiveMatchesFromSportAPI();
+      console.log(`[In-Play Debug] Eventos en vivo recibidos de SportAPI7: ${liveEvents?.length || 0}`);
+    } catch (apiErr) {
+      console.error("[In-Play Debug] Error al conectar con SportAPI7:", apiErr);
+    }
+
     let matchContext = null;
 
-    if (liveEvents.length > 0) {
+    if (liveEvents && liveEvents.length > 0) {
       const liveListSummary = liveEvents.map((e: any) => ({
         id: e.id,
         partido: `${e.homeTeam?.name} vs ${e.awayTeam?.name}`,
@@ -53,11 +60,15 @@ export async function POST(req: Request) {
           messages: [
             {
               role: "system",
-              content: "Identifica qué evento de la lista corresponde a la búsqueda. Devuelve un JSON: {\"matchedId\": number | null}.",
+              content: `Identifica si el partido buscado existe en la lista en vivo.
+              REGLAS:
+              - Traduce nombres de países de español a inglés si aplica.
+              - Si encuentras coincidencia, devuelve JSON: {"matchedId": number}.
+              - Si NO encuentras el partido exacto, devuelve JSON: {"matchedId": null}.`,
             },
             {
               role: "user",
-              content: `Búsqueda: "${searchString}". Lista en vivo: ${JSON.stringify(liveListSummary)}`,
+              content: `Búsqueda: "${searchString}". Lista en vivo actual (${liveListSummary.length} partidos): ${JSON.stringify(liveListSummary)}`,
             },
           ],
           response_format: { type: "json_object" },
@@ -74,29 +85,39 @@ export async function POST(req: Request) {
               marcador: `${matchedEvent.homeScore?.current ?? 0} - ${matchedEvent.awayScore?.current ?? 0}`,
               torneo: matchedEvent.tournament?.name,
             };
+            console.log(`[In-Play Debug] Coincidencia encontrada en vivo:`, matchContext);
           }
         }
       } catch (e) {
-        console.warn("No se pudo matchear automáticamente el evento en vivo.");
+        console.warn("[In-Play Debug] Error en matcher:", e);
       }
     }
 
-    // Determinar el minuto y marcador finales a presentar
-    const minutoFinal = matchContext?.minuto || minutoUsuario || "En curso";
-    const marcadorFinal = matchContext?.marcador || marcadorUsuario || "0-0";
+    // 2. BLOQUEAR SI NO HAY CONEXIÓN NI MARCADOR MANUAL
+    if (!matchContext && !marcadorUsuario) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `No se pudo conectar con la transmisión en vivo de "${searchString}" en SportAPI7. Para continuar con la proyección, ingresa el marcador y el minuto actual manualmente.`,
+        },
+        { status: 400 }
+      );
+    }
 
-    // 2. PROMPT DINÁMICO SIN VALORES HARDCODED
+    const minutoFinal = matchContext?.minuto || minutoUsuario;
+    const marcadorFinal = matchContext?.marcador || marcadorUsuario;
+
+    // 3. GENERAR PROYECCIÓN REAL
     const systemPrompt = `
       Eres un In-Play Trader cuantitativo experto en apuestas en vivo.
       
-      REGLAS CRÍTICAS DE ANÁLISIS EN VIVO:
-      1. Respeta ESTRICTAMENTE el minuto y marcador provistos en el prompt. NUNCA inventes o asumas un minuto o marcador distinto.
-      2. Solo debes proponer mercados sobre EVENTOS FUTUROS (lo que ocurrirá desde el minuto provisto hasta el final).
-      3. NUNCA sugieras una línea que ya fue alcanzada o superada.
+      REGLAS OBLIGATORIAS:
+      1. Evalúa la dinámica considerando el marcador actual (${marcadorFinal}) y minuto (${minutoFinal}).
+      2. NUNCA asumas un marcador de 0-0 si el marcador indicado es diferente.
 
-      DEVUELVE UN JSON ESTRICTO CON LA SIGUIENTE ESTRUCTURA:
+      DEVUELVE UN JSON ESTRICTO:
       {
-        "partido": "${searchString}",
+        "partido": "${matchContext?.partidoOficial || searchString}",
         "minuto": "${minutoFinal}",
         "marcadorActual": "${marcadorFinal}",
         "nivelRiesgo": "Bajo" | "Medio" | "Alto",
@@ -106,34 +127,25 @@ export async function POST(req: Request) {
           "cuotaEstimada": 1.85,
           "probabilidadEstimada": 82
         },
-        "analisisMomentum": "Explicación del ritmo de juego y presión según el minuto y marcador actual real.",
+        "analisisMomentum": "Análisis táctico real considerando el marcador ${marcadorFinal} en el minuto ${minutoFinal}.",
         "recomendacionStake": "Stake sugerido (Ej: Stake 1.5/5)"
       }
-    `;
-
-    const userPrompt = `
-      DATOS DEL PARTIDO EN VIVO:
-      - Partido: ${matchContext?.partidoOficial || searchString}
-      - Torneo: ${matchContext?.torneo || "Liga / Torneo Oficial"}
-      - Minuto Actual: ${minutoFinal}
-      - Marcador Actual: ${marcadorFinal}
-
-      Genera una proyección In-Play cuantitativa considerando exclusivamente el tiempo restante desde el minuto ${minutoFinal} con el marcador ${marcadorFinal}.
     `;
 
     const openAiRes = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        {
+          role: "user",
+          content: `Proyección para ${searchString}. Minuto: ${minutoFinal}. Marcador: ${marcadorFinal}.`,
+        },
       ],
       response_format: { type: "json_object" },
       temperature: 0.1,
     });
 
     const result = JSON.parse(openAiRes.choices[0].message.content || "{}");
-
-    // Asegurar que preserve los datos correctos
     result.minuto = minutoFinal;
     result.marcadorActual = marcadorFinal;
 
