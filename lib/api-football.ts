@@ -1,28 +1,52 @@
 import axios from "axios";
 import { MatchData, OddsData, LineupsData } from "./types";
 
-const API_HOST = process.env.RAPIDAPI_HOST || "sportapi7.p.rapidapi.com";
-const API_KEY = process.env.RAPIDAPI_KEY || process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
 const API_BASE_URL = "https://sportapi7.p.rapidapi.com/api/v1";
 
+// Helper para obtener las credenciales dinámicamente en tiempo de ejecución
+function getApiCredentials() {
+  const apiKey =
+    process.env.RAPIDAPI_KEY ||
+    process.env.FOOTBALL_API_KEY ||
+    process.env.NEXT_PUBLIC_RAPIDAPI_KEY ||
+    "";
+  const apiHost = process.env.RAPIDAPI_HOST || "sportapi7.p.rapidapi.com";
+
+  return { apiKey, apiHost };
+}
+
+// Instancia base de Axios
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "x-rapidapi-key": API_KEY,
-    "x-rapidapi-host": API_HOST,
-  },
+});
+
+// Interceptor para inyectar dinámicamente los headers en CADA petición HTTP
+apiClient.interceptors.request.use((config) => {
+  const { apiKey, apiHost } = getApiCredentials();
+  config.headers["x-rapidapi-key"] = apiKey;
+  config.headers["x-rapidapi-host"] = apiHost;
+  return config;
 });
 
 /**
  * Obtiene eventos en vivo directamente desde SportAPI7
  */
 export async function getLiveMatchesFromSportAPI() {
-  if (!API_KEY) return [];
+  const { apiKey } = getApiCredentials();
+  
+  if (!apiKey) {
+    console.error("[SportAPI7] ERROR CRÍTICO: No se encontró RAPIDAPI_KEY ni FOOTBALL_API_KEY en las variables de entorno.");
+    return [];
+  }
+
   try {
     const res = await apiClient.get("/sport/football/events/live");
     return res.data?.events || [];
   } catch (error: any) {
-    console.warn("SportAPI7: No se pudieron obtener los eventos en vivo.", error.message);
+    console.warn(
+      "[SportAPI7] Error al obtener eventos en vivo:",
+      error.response?.data || error.message
+    );
     return [];
   }
 }
@@ -32,7 +56,8 @@ export async function getLiveMatchesFromSportAPI() {
  */
 export async function searchMatch(teamA: string, teamB: string): Promise<MatchData> {
   try {
-    if (!API_KEY) {
+    const { apiKey } = getApiCredentials();
+    if (!apiKey) {
       throw new Error("Falta la clave RAPIDAPI_KEY en las variables de entorno.");
     }
 
@@ -64,13 +89,13 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
           continue;
         }
       }
-    } catch {
-      console.warn("SportAPI no retornó eventos activos para hoy. Usando datos de respaldo.");
+    } catch (err: any) {
+      console.warn("[SportAPI7] No retornó eventos activos para hoy. Usando datos de respaldo.", err.message);
     }
 
     // 3. Respaldo si no existe el partido en la API hoy
     if (!targetEvent) {
-      console.log(`Generando datos simulados para: ${teamA} vs ${teamB}`);
+      console.log(`[SportAPI] Generando datos simulados para: ${teamA} vs ${teamB}`);
       return getFallbackMatchData(teamA, teamB, today);
     }
 
