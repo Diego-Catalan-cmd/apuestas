@@ -28,6 +28,52 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Diccionario de equivalencias español -> inglés para selecciones y clubes principales
+const TEAM_NAME_MAP: Record<string, string[]> = {
+  "españa": ["spain"],
+  "alemania": ["germany"],
+  "francia": ["france"],
+  "inglaterra": ["england"],
+  "italia": ["italy"],
+  "países bajos": ["netherlands", "holland"],
+  "paises bajos": ["netherlands"],
+  "república dominicana": ["dominican republic"],
+  "republica dominicana": ["dominican republic"],
+  "haití": ["haiti"],
+  "haiti": ["haiti"],
+  "brasil": ["brazil"],
+  "croacia": ["croatia"],
+  "bélgica": ["belgium"],
+  "belgica": ["belgium"],
+  "suiza": ["switzerland"],
+  "suecia": ["sweden"],
+  "dinamarca": ["denmark"],
+  "turquía": ["turkey", "turkiye"],
+  "turquia": ["turkey"],
+  "marruecos": ["morocco"],
+  "japón": ["japan"],
+  "japon": ["japan"],
+  "corea del sur": ["south korea", "korea republic"],
+  "costa de marfil": ["ivory coast", "côte d'ivoire", "cote d'ivoire"],
+  // Selecciones y clubes de Uruguay y Perú
+  "uruguay": ["uruguay"],
+  "perú": ["peru"],
+  "peru": ["peru"],
+  "peñarol": ["penarol", "club atletico penarol"],
+  "nacional": ["club nacional de football", "nacional montevideo"],
+  "universitario": ["universitario de deportes"],
+  "alianza lima": ["alianza"],
+  "sporting cristal": ["cristal"],
+  "melgar": ["fbc melgar"]
+};
+
+// Genera una lista de variantes posibles para un equipo
+function getTeamVariants(name: string): string[] {
+  const clean = name.toLowerCase().trim();
+  const translations = TEAM_NAME_MAP[clean] || [];
+  return [clean, ...translations];
+}
+
 /**
  * Obtiene eventos en vivo directamente desde SportAPI7
  */
@@ -52,7 +98,7 @@ export async function getLiveMatchesFromSportAPI() {
 }
 
 /**
- * Busca un partido en SportAPI7 con barrido de categorías y respaldo automático
+ * Busca un partido en SportAPI7 con barrido de categorías (Sin datos de respaldo)
  */
 export async function searchMatch(teamA: string, teamB: string): Promise<MatchData> {
   try {
@@ -64,12 +110,16 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
     const today = new Date().toISOString().split("T")[0];
     let targetEvent: any = null;
 
+    // Generar variantes antes de iterar para optimizar recursos
+    const teamAVariants = getTeamVariants(teamA);
+    const teamBVariants = getTeamVariants(teamB);
+
     try {
       // 1. Obtener categorías deportivas activas hoy
       const categoriesRes = await apiClient.get(`/sport/football/${today}/0/categories`);
       const categories = categoriesRes.data?.categories || [];
 
-      // 2. Buscar evento coincidente
+      // 2. Buscar evento coincidente considerando variantes en español e inglés
       for (const cat of categories) {
         if (targetEvent) break;
 
@@ -80,23 +130,24 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
           targetEvent = events.find((e: any) => {
             const home = e.homeTeam?.name?.toLowerCase() || "";
             const away = e.awayTeam?.name?.toLowerCase() || "";
-            const tA = teamA.toLowerCase();
-            const tB = teamB.toLowerCase();
 
-            return (home.includes(tA) && away.includes(tB)) || (home.includes(tB) && away.includes(tA));
+            const matchA = teamAVariants.some((variant) => home.includes(variant) || away.includes(variant));
+            const matchB = teamBVariants.some((variant) => home.includes(variant) || away.includes(variant));
+
+            return matchA && matchB;
           });
         } catch {
           continue;
         }
       }
     } catch (err: any) {
-      console.warn("[SportAPI7] No retornó eventos activos para hoy. Usando datos de respaldo.", err.message);
+      console.warn("[SportAPI7] Error al intentar obtener categorías activas para hoy:", err.message);
     }
 
-    // 3. Respaldo si no existe el partido en la API hoy
+    // 3. Excepción explícita si no existe el partido en la API hoy
     if (!targetEvent) {
-      console.log(`[SportAPI] Generando datos simulados para: ${teamA} vs ${teamB}`);
-      return getFallbackMatchData(teamA, teamB, today);
+      console.warn(`[SportAPI] Partido no encontrado: ${teamA} vs ${teamB}`);
+      throw new Error(`El partido entre ${teamA} y ${teamB} no se encontró en la API para el día de hoy (${today}). El análisis ha sido interrumpido porque no hay datos reales disponibles.`);
     }
 
     // 4. Cargar cuotas y alineaciones
@@ -148,34 +199,6 @@ export function getTimeUntilMatch(
   }
 
   return 2.2;
-}
-
-function getFallbackMatchData(teamA: string, teamB: string, date: string): MatchData {
-  return {
-    matchId: "mock-101",
-    teamA: teamA.toUpperCase(),
-    teamB: teamB.toUpperCase(),
-    date: date,
-    time: "12:30",
-    league: "Serie A / Liga Principal",
-    status: "scheduled",
-    odds: {
-      home: 2.15,
-      draw: 3.30,
-      away: 3.50,
-      over2_5: 1.90,
-      under2_5: 1.85,
-      bothTeamsScore: 1.80,
-    },
-    lineups: {
-      homeTeam: { formation: "4-3-3", players: [] },
-      awayTeam: { formation: "4-4-2", players: [] },
-    },
-    injuries: {
-      homeTeam: [{ player: "Jugador Clave", type: "Molestia Muscular", returnDate: "En evaluación" }],
-      awayTeam: [],
-    },
-  };
 }
 
 function parseOdds(oddsResponse: any): OddsData {

@@ -29,23 +29,16 @@ export async function POST(req: Request) {
 
     if (!searchString || searchString === "vs") {
       return NextResponse.json(
-        { success: false, error: "Por favor, ingresa el nombre de los equipos." },
+        { success: false, error: "Por favor, ingresa los nombres de los equipos para el análisis en vivo." },
         { status: 400 }
       );
     }
 
-    // 1. OBTENER EVENTOS EN VIVO Y DEPURAR
-    let liveEvents: any[] = [];
-    try {
-      liveEvents = await getLiveMatchesFromSportAPI();
-      console.log(`[In-Play Debug] Eventos en vivo recibidos de SportAPI7: ${liveEvents?.length || 0}`);
-    } catch (apiErr) {
-      console.error("[In-Play Debug] Error al conectar con SportAPI7:", apiErr);
-    }
-
+    // 1. OBTENER EVENTOS EN VIVO Y EMPAREJAR CON MATCHER MULTILINGÜE
+    const liveEvents = await getLiveMatchesFromSportAPI();
     let matchContext = null;
 
-    if (liveEvents && liveEvents.length > 0) {
+    if (liveEvents.length > 0) {
       const liveListSummary = liveEvents.map((e: any) => ({
         id: e.id,
         partido: `${e.homeTeam?.name} vs ${e.awayTeam?.name}`,
@@ -60,15 +53,15 @@ export async function POST(req: Request) {
           messages: [
             {
               role: "system",
-              content: `Identifica si el partido buscado existe en la lista en vivo.
-              REGLAS:
-              - Traduce nombres de países de español a inglés si aplica.
-              - Si encuentras coincidencia, devuelve JSON: {"matchedId": number}.
-              - Si NO encuentras el partido exacto, devuelve JSON: {"matchedId": null}.`,
+              content: `Identifica qué evento de la lista corresponde a la búsqueda del usuario.
+              REGLAS DE BÚSQUEDA:
+              - Traduce nombres de países/equipos de español a inglés si es necesario (ej: "República Dominicana" = "Dominican Republic", "Haití" = "Haiti", "Estados Unidos" = "USA", "Alemania" = "Germany").
+              - Ignora tildes, minúsculas, mayúsculas y pequeñas diferencias ortográficas.
+              Devuelve un JSON estricto: {"matchedId": number | null}.`
             },
             {
               role: "user",
-              content: `Búsqueda: "${searchString}". Lista en vivo actual (${liveListSummary.length} partidos): ${JSON.stringify(liveListSummary)}`,
+              content: `Búsqueda: "${searchString}". Lista en vivo actual: ${JSON.stringify(liveListSummary)}`,
             },
           ],
           response_format: { type: "json_object" },
@@ -85,37 +78,38 @@ export async function POST(req: Request) {
               marcador: `${matchedEvent.homeScore?.current ?? 0} - ${matchedEvent.awayScore?.current ?? 0}`,
               torneo: matchedEvent.tournament?.name,
             };
-            console.log(`[In-Play Debug] Coincidencia encontrada en vivo:`, matchContext);
           }
         }
       } catch (e) {
-        console.warn("[In-Play Debug] Error en matcher:", e);
+        console.warn("Error en el matcher de eventos en vivo:", e);
       }
     }
 
-    // 2. BLOQUEAR SI NO HAY CONEXIÓN NI MARCADOR MANUAL
+    // 2. VALIDACIÓN DE DATOS
+    const minutoFinal = matchContext?.minuto || minutoUsuario;
+    const marcadorFinal = matchContext?.marcador || marcadorUsuario;
+
+    // Si la API no detectó el evento y el usuario tampoco ingresó marcador
     if (!matchContext && !marcadorUsuario) {
       return NextResponse.json(
         {
           success: false,
-          error: `No se pudo conectar con la transmisión en vivo de "${searchString}" en SportAPI7. Para continuar con la proyección, ingresa el marcador y el minuto actual manualmente.`,
+          error: `No se detectó la transmisión en tiempo real para "${searchString}". Por favor, ingresa el marcador actual y el minuto manualmente para realizar la proyección.`,
         },
         { status: 400 }
       );
     }
 
-    const minutoFinal = matchContext?.minuto || minutoUsuario;
-    const marcadorFinal = matchContext?.marcador || marcadorUsuario;
-
-    // 3. GENERAR PROYECCIÓN REAL
+    // 3. GENERAR PROYECCIÓN IN-PLAY BASADA EN DATOS REALES
     const systemPrompt = `
       Eres un In-Play Trader cuantitativo experto en apuestas en vivo.
       
       REGLAS OBLIGATORIAS:
-      1. Evalúa la dinámica considerando el marcador actual (${marcadorFinal}) y minuto (${minutoFinal}).
+      1. Evalúa el escenario basándote EXCLUSIVAMENTE en el marcador actual (${marcadorFinal}) y el minuto (${minutoFinal}).
       2. NUNCA asumas un marcador de 0-0 si el marcador indicado es diferente.
+      3. Sugiere únicamente líneas futuras para el tiempo restante del partido.
 
-      DEVUELVE UN JSON ESTRICTO:
+      DEVUELVE UN JSON ESTRICTO CON LA SIGUIENTE ESTRUCTURA:
       {
         "partido": "${matchContext?.partidoOficial || searchString}",
         "minuto": "${minutoFinal}",
@@ -123,11 +117,11 @@ export async function POST(req: Request) {
         "nivelRiesgo": "Bajo" | "Medio" | "Alto",
         "pronosticoPrincipal": {
           "mercado": "Córneres / Tarjetas / Goles en Tiempo Restante",
-          "seleccion": "Línea futura precisa para el tiempo restante",
+          "seleccion": "Línea futura precisa considerando el marcador actual",
           "cuotaEstimada": 1.85,
           "probabilidadEstimada": 82
         },
-        "analisisMomentum": "Análisis táctico real considerando el marcador ${marcadorFinal} en el minuto ${minutoFinal}.",
+        "analisisMomentum": "Análisis táctico real considerando que el partido va ${marcadorFinal} en el minuto ${minutoFinal}.",
         "recomendacionStake": "Stake sugerido (Ej: Stake 1.5/5)"
       }
     `;
@@ -138,7 +132,7 @@ export async function POST(req: Request) {
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Proyección para ${searchString}. Minuto: ${minutoFinal}. Marcador: ${marcadorFinal}.`,
+          content: `Genera la proyección In-Play para ${searchString}. Minuto actual: ${minutoFinal}. Marcador actual: ${marcadorFinal}.`,
         },
       ],
       response_format: { type: "json_object" },
