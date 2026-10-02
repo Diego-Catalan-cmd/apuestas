@@ -30,6 +30,22 @@ apiClient.interceptors.request.use((config) => {
 
 // Diccionario de equivalencias español -> inglés para selecciones y clubes principales
 const TEAM_NAME_MAP: Record<string, string[]> = {
+  // Selecciones añadidas
+  "nicaragua": ["nicaragua"],
+  "costa rica": ["costa rica"],
+  "polonia": ["poland"],
+  "rumania": ["romania"],
+  "bosnia y herzegovina": ["bosnia & herzegovina", "bosnia and herzegovina", "bosnia"],
+  "ucrania": ["ukraine"],
+  "irlanda del norte": ["northern ireland"],
+  "islas feroé": ["faroe islands"],
+  "islas feroe": ["faroe islands"],
+  "eslovaquia": ["slovakia"],
+  "kazajistán": ["kazakhstan"],
+  "kazajistan": ["kazakhstan"],
+  "moldavia": ["moldova"],
+
+  // Equipos y selecciones previas
   "españa": ["spain"],
   "alemania": ["germany"],
   "francia": ["france"],
@@ -55,7 +71,6 @@ const TEAM_NAME_MAP: Record<string, string[]> = {
   "japon": ["japan"],
   "corea del sur": ["south korea", "korea republic"],
   "costa de marfil": ["ivory coast", "côte d'ivoire", "cote d'ivoire"],
-  // Selecciones y clubes de Uruguay y Perú
   "uruguay": ["uruguay"],
   "perú": ["peru"],
   "peru": ["peru"],
@@ -98,16 +113,21 @@ export async function getLiveMatchesFromSportAPI() {
 }
 
 /**
- * Busca un partido en SportAPI7 con barrido de categorías (Sin datos de respaldo)
+ * Busca un partido en SportAPI7 especificando opcionalmente la fecha (YYYY-MM-DD)
  */
-export async function searchMatch(teamA: string, teamB: string): Promise<MatchData> {
+export async function searchMatch(
+  teamA: string, 
+  teamB: string, 
+  targetDate?: string
+): Promise<MatchData> {
   try {
     const { apiKey } = getApiCredentials();
     if (!apiKey) {
-      throw new Error("Falta la clave RAPIDAPI_KEY en las variables de entorno.");
+      throw new Error("No se ha configurado la clave de API (RAPIDAPI_KEY).");
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    // Si no se indica fecha, usa la fecha actual
+    const searchDate = targetDate || new Date().toISOString().split("T")[0];
     let targetEvent: any = null;
 
     // Generar variantes antes de iterar para optimizar recursos
@@ -115,16 +135,16 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
     const teamBVariants = getTeamVariants(teamB);
 
     try {
-      // 1. Obtener categorías deportivas activas hoy
-      const categoriesRes = await apiClient.get(`/sport/football/${today}/0/categories`);
+      // 1. Obtener categorías deportivas de la fecha objetivo
+      const categoriesRes = await apiClient.get(`/sport/football/${searchDate}/0/categories`);
       const categories = categoriesRes.data?.categories || [];
 
-      // 2. Buscar evento coincidente considerando variantes en español e inglés
+      // 2. Buscar evento coincidente en la fecha objetivo
       for (const cat of categories) {
         if (targetEvent) break;
 
         try {
-          const eventsRes = await apiClient.get(`/category/${cat.id}/scheduled-events/${today}`);
+          const eventsRes = await apiClient.get(`/category/${cat.id}/scheduled-events/${searchDate}`);
           const events = eventsRes.data?.events || [];
 
           targetEvent = events.find((e: any) => {
@@ -141,16 +161,17 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
         }
       }
     } catch (err: any) {
-      console.warn("[SportAPI7] Error al intentar obtener categorías activas para hoy:", err.message);
+      console.warn(`[SportAPI7] Error al intentar obtener categorías activas para la fecha ${searchDate}:`, err.message);
     }
 
-    // 3. Excepción explícita si no existe el partido en la API hoy
+    // 3. Si no existe en la fecha especificada, lanzar error explícito
     if (!targetEvent) {
-      console.warn(`[SportAPI] Partido no encontrado: ${teamA} vs ${teamB}`);
-      throw new Error(`El partido entre ${teamA} y ${teamB} no se encontró en la API para el día de hoy (${today}). El análisis ha sido interrumpido porque no hay datos reales disponibles.`);
+      throw new Error(
+        `No se encontraron datos reales en SportAPI7 para el partido "${teamA} vs ${teamB}" en la fecha ${searchDate}. Proceso abortado.`
+      );
     }
 
-    // 4. Cargar cuotas y alineaciones
+    // 4. Cargar cuotas y alineaciones reales
     const eventId = targetEvent.id;
     const [oddsRes, lineupRes] = await Promise.allSettled([
       apiClient.get(`/event/${eventId}/odds`),
@@ -164,9 +185,9 @@ export async function searchMatch(teamA: string, teamB: string): Promise<MatchDa
       matchId: eventId.toString(),
       teamA: targetEvent.homeTeam?.name || teamA,
       teamB: targetEvent.awayTeam?.name || teamB,
-      date: today,
+      date: searchDate,
       time: "12:30",
-      league: targetEvent.tournament?.name || "Liga Principal",
+      league: targetEvent.tournament?.name || "Nations League / Selección",
       status: targetEvent.status?.type === "inprogress" ? "live" : "scheduled",
       odds: parseOdds(oddsData),
       lineups: parseLineups(lineupData),
